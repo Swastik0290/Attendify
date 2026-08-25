@@ -116,8 +116,9 @@ export function StudentScanner() {
         console.error('QR scanner initialization error:', err)
       }
     }
+  }
 
-    return () => {
+  return () => {
       if (scannerRef.current) {
         scannerRef.current.clear().catch(console.error)
       }

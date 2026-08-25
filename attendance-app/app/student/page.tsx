@@ -39,6 +39,9 @@ export default async function StudentDashboardPage() {
   }
 
   const profile = data.profile
+  const enrolledSubjects = (data as any).enrolledSubjects || []
+  const attendanceRecords = (data as any).attendanceRecords || []
+
   if (!profile) {
     return <AuthLoginForm role="STUDENT" />
   }
@@ -117,16 +120,16 @@ export default async function StudentDashboardPage() {
           <h2 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
             <BookOpen className="h-4 w-4 text-slate-700" /> My Enrolled Subjects
           </h2>
-          <span className="text-xs text-slate-500">{data.enrolledSubjects.length} subjects</span>
+          <span className="text-xs text-slate-500">{enrolledSubjects.length} subjects</span>
         </div>
 
         <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {data.enrolledSubjects.length === 0 ? (
+          {enrolledSubjects.length === 0 ? (
             <div className="col-span-2 py-6 text-center text-xs text-slate-400">
               You are not currently enrolled in any course rosters.
             </div>
           ) : (
-            data.enrolledSubjects.map((sub) => (
+            enrolledSubjects.map((sub: any) => (
               <div
                 key={sub.id}
                 className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 flex flex-col justify-between"
@@ -153,7 +156,7 @@ export default async function StudentDashboardPage() {
           <h2 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
             <CheckCircle2 className="h-4 w-4 text-emerald-600" /> Recent Attendance History
           </h2>
-          <span className="text-xs text-slate-500">{data.attendanceRecords.length} records</span>
+          <span className="text-xs text-slate-500">{attendanceRecords.length} records</span>
         </div>
 
         <div className="overflow-x-auto">
@@ -166,14 +169,14 @@ export default async function StudentDashboardPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {data.attendanceRecords.length === 0 ? (
+              {attendanceRecords.length === 0 ? (
                 <tr>
                   <td colSpan={3} className="px-5 py-8 text-center text-slate-400">
                     No attendance records found yet. Click &quot;Scan Classroom QR&quot; to record attendance.
                   </td>
                 </tr>
               ) : (
-                data.attendanceRecords.map((rec) => (
+                attendanceRecords.map((rec: any) => (
                   <tr key={rec.id} className="hover:bg-slate-50">
                     <td className="px-5 py-3 font-semibold text-slate-900">
                       {rec.subjectCode} • {rec.subjectName}
