@@ -100,7 +100,10 @@ export function RosterUploader({
 
     startTransition(async () => {
       try {
-        const res = await importStudentRoster(validationResult.validRows, subjectId)
+        // React Server Actions cannot serialize `undefined` values within objects,
+        // so we sanitize the payload by stringifying & parsing it first.
+        const payload = JSON.parse(JSON.stringify(validationResult.validRows))
+        const res = await importStudentRoster(payload, subjectId)
         if (res.success) {
           setImportStatus({
             success: true,
