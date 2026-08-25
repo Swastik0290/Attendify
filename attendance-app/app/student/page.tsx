@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { getStudentDashboardData, signOut } from '@/lib/actions'
 import { AuthLoginForm } from '@/components/AuthLoginForm'
 import { PasskeyManager } from '@/components/student/PasskeyManager'
-import { GraduationCap, QrCode, CheckCircle2, BookOpen, LogOut } from 'lucide-react'
+import { GraduationCap, QrCode, CheckCircle2, BookOpen, LogOut, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 
 export const metadata: Metadata = { title: 'Student Portal' }
@@ -12,6 +12,30 @@ export default async function StudentDashboardPage() {
 
   if (!data) {
     return <AuthLoginForm role="STUDENT" />
+  }
+
+  if (data.isRegistered === false) {
+    return (
+      <main className="max-w-md mx-auto p-4 sm:p-6 mt-10">
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 text-center space-y-4">
+          <div className="mx-auto w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center mb-4">
+            <AlertTriangle className="h-6 w-6 text-amber-500" />
+          </div>
+          <h1 className="text-xl font-bold text-slate-900">Student Profile Not Found</h1>
+          <p className="text-sm text-slate-500">
+            You are logged in as <span className="font-semibold text-slate-900">{data.email}</span>, but your Roll Number has not been registered yet.
+          </p>
+          <p className="text-sm text-slate-500">
+            Please wait for your faculty to upload the class roster containing your email address.
+          </p>
+          <form action={signOut} className="pt-4">
+            <button type="submit" className="w-full rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 transition-colors">
+              Sign Out
+            </button>
+          </form>
+        </div>
+      </main>
+    )
   }
 
   const profile = data.profile

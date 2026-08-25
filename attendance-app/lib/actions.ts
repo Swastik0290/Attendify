@@ -796,6 +796,9 @@ export async function getStudentDashboardData(studentId?: string) {
   const session = await getSession()
   const effectiveStudentId = studentId || session?.studentProfile?.id
   if (!effectiveStudentId) {
+    if (session?.userId) {
+      return { isRegistered: false, email: session.email }
+    }
     return null
   }
 
@@ -822,6 +825,7 @@ export async function getStudentDashboardData(studentId?: string) {
     .order('scanned_at', { ascending: false })
 
   return {
+    isRegistered: true,
     profile: profile || session?.studentProfile,
     enrolledSubjects:
       enrollments?.map((e) => ({
