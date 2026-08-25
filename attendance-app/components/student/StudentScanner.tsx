@@ -15,6 +15,7 @@ import { submitAttendanceScan, ScanAttendanceResult } from '@/lib/actions'
 import { getAuthenticationOptions, verifyAuthentication } from '@/lib/passkey-actions'
 import { startAuthentication } from '@simplewebauthn/browser'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 
 export function StudentScanner() {
   const [scanResult, setScanResult] = useState<ScanAttendanceResult | null>(null)
@@ -23,9 +24,20 @@ export function StudentScanner() {
   const scannerRef = useRef<Html5QrcodeScanner | null>(null)
   const isMountedRef = useRef(false)
 
+  const searchParams = useSearchParams()
+  const urlToken = searchParams.get('token')
+
   const handleProcessScannedData = useCallback(async (data: string) => {
     if (isProcessing) return
     setIsProcessing(true)
+
+    let tokenToSubmit = data
+    if (data.startsWith('http')) {
+      try {
+        const url = new URL(data)
+        tokenToSubmit = url.searchParams.get('token') || data
+      } catch (e) {}
+    }
 
     try {
       if (typeof window !== 'undefined' && 'navigator' in window && navigator.vibrate) {
@@ -55,7 +67,7 @@ export function StudentScanner() {
         }
       }
 
-      const result = await submitAttendanceScan(data)
+      const result = await submitAttendanceScan(tokenToSubmit)
       setScanResult(result)
     } catch (err: unknown) {
       setScanResult({
@@ -69,9 +81,15 @@ export function StudentScanner() {
   }, [isProcessing])
 
   useEffect(() => {
+    if (urlToken && !isMountedRef.current) {
+      handleProcessScannedData(urlToken)
+    }
+
     if (!isMountedRef.current && typeof window !== 'undefined') {
       isMountedRef.current = true
-      try {
+      // Don't auto-start camera if we already have a token from URL
+      if (!urlToken) {
+        try {
         const scanner = new Html5QrcodeScanner(
           'qr-reader-container',
           {
@@ -104,7 +122,7 @@ export function StudentScanner() {
         scannerRef.current.clear().catch(console.error)
       }
     }
-  }, [handleProcessScannedData])
+  }, [handleProcessScannedData, urlToken])
 
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault()

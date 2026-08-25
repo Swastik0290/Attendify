@@ -14,7 +14,7 @@ export default async function StudentDashboardPage() {
     return <AuthLoginForm role="STUDENT" />
   }
 
-  if (data.isRegistered === false) {
+  if (data.isRegistered === false || !('enrolledSubjects' in data) || !('attendanceRecords' in data)) {
     return (
       <main className="max-w-md mx-auto p-4 sm:p-6 mt-10">
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 text-center space-y-4">
