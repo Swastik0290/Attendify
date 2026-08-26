@@ -105,9 +105,11 @@ export function RosterUploader({
         const payload = JSON.parse(JSON.stringify(validationResult.validRows))
         const res = await importStudentRoster(payload, subjectId)
         if (res.success) {
+          const successMsg = `Successfully imported ${res.importedCount} new, updated ${res.updatedCount || 0} existing profiles, and created ${res.enrolledCount} enrollments!`
+          handleReset()
           setImportStatus({
             success: true,
-            message: `Successfully imported ${res.importedCount} new student profiles and created ${res.enrolledCount} enrollments!`,
+            message: successMsg,
           })
           router.refresh()
         }

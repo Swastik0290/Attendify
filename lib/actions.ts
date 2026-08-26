@@ -419,6 +419,7 @@ export async function importStudentRoster(
 
   let importedCount = 0
   let enrolledCount = 0
+  let updatedCount = 0
 
   for (const row of rows) {
     const cleanRoll = row.rollNumber.trim().toUpperCase()
@@ -482,6 +483,7 @@ export async function importStudentRoster(
           updated_at: new Date().toISOString(),
         })
         .eq('id', studentId)
+      updatedCount++
     }
 
     // 3. Enroll into subject if subjectId is provided
@@ -504,7 +506,7 @@ export async function importStudentRoster(
     safeRevalidate(`/faculty/subjects/${subjectId}`)
   }
 
-  return { success: true, importedCount, enrolledCount }
+  return { success: true, importedCount, updatedCount, enrolledCount }
 }
 
 // ─── ATTENDANCE SESSIONS & ROTATING QR ACTIONS ─────────────────────────────────
