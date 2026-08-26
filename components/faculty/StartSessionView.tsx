@@ -18,6 +18,7 @@ interface StartSessionViewProps {
 export function StartSessionView({
   subjectId,
   subjectCode,
+  subjectName,
   existingActiveSession,
   activeSessionNumber,
   nextSessionNumber,
