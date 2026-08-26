@@ -16,6 +16,7 @@ import {
   getSessionAttendanceLive,
   closeAttendanceSession,
 } from '@/lib/actions'
+import { DownloadAttendanceButton } from '@/components/DownloadAttendanceButton'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -208,13 +209,22 @@ export function LiveQRSession({ sessionId, subjectCode, subjectName }: LiveQRSes
               </p>
             </div>
 
-            <div className="text-right">
-              <div className="text-lg font-extrabold text-emerald-600">
-                {presentStudents.length} {totalEnrolled > 0 ? `/ ${totalEnrolled}` : ''}
+            <div className="flex flex-col items-end gap-1.5">
+              <div className="text-right">
+                <div className="text-lg font-extrabold text-emerald-600">
+                  {presentStudents.length} {totalEnrolled > 0 ? `/ ${totalEnrolled}` : ''}
+                </div>
+                <div className="text-[10px] font-semibold uppercase text-slate-400 tracking-wider">
+                  Present
+                </div>
               </div>
-              <div className="text-[10px] font-semibold uppercase text-slate-400 tracking-wider">
-                Present
-              </div>
+              {presentStudents.length > 0 && (
+                <DownloadAttendanceButton
+                  sessionId={sessionId}
+                  subjectCode={subjectCode}
+                  label="Export"
+                />
+              )}
             </div>
           </div>
 

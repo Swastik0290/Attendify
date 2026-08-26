@@ -14,7 +14,7 @@ export default async function SessionsPage() {
         title="Attendance Sessions"
         description="Monitor active classroom sessions in real time and review historical attendance records across all institutional subjects."
       />
-      <SessionsTabs initialSessions={sessions} />
+      <SessionsTabs initialSessions={sessions} isAdmin />
     </div>
   )
 }

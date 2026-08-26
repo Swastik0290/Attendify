@@ -433,11 +433,15 @@ export async function importStudentRoster(
     let studentId = existingStudent?.id
 
     if (!studentId) {
-      const studentEmail = `${cleanRoll.toLowerCase()}@student.institution.ac.in`
+      // Use NIT Rourkela institutional email domain as default
+      const studentEmail = `${cleanRoll.toLowerCase()}@nitrkl.ac.in`
       
-      // Try to find existing auth user first
+      // Try to find existing auth user first (by both possible domains)
       const { data: existingUsers } = await adminClient.auth.admin.listUsers()
-      const authUser = existingUsers.users.find(u => u.email === studentEmail)
+      const authUser = existingUsers.users.find(
+        u => u.email === studentEmail ||
+             u.email === `${cleanRoll.toLowerCase()}@student.institution.ac.in`
+      )
       
       if (authUser) {
         studentId = authUser.id
@@ -448,8 +452,8 @@ export async function importStudentRoster(
         await ensureAuthUser(studentId, studentEmail, 'STUDENT')
       }
 
-      // Create student profile
-      const studentInsertEmail = row.email?.trim().toLowerCase() || `${cleanRoll.toLowerCase()}@student.institution.ac.in`
+      // Create student profile — use their real email from CSV if provided, otherwise the institutional default
+      const studentInsertEmail = row.email?.trim().toLowerCase() || `${cleanRoll.toLowerCase()}@nitrkl.ac.in`
       await adminClient.from('student_profiles').insert({
         id: studentId,
         roll_number: cleanRoll,
@@ -586,6 +590,76 @@ export async function closeAttendanceSession(sessionId: string) {
   safeRevalidate('/admin/sessions')
   safeRevalidate('/faculty')
   return { success: true }
+}
+
+export async function deleteAttendanceSession(sessionId: string) {
+  const session = await getSession()
+  if (session?.role !== 'SUPER_ADMIN') {
+    throw new Error('Unauthorized: Only Super Admin can delete sessions')
+  }
+
+  const adminClient = createAdminClient()
+  // Only allow deleting closed sessions
+  const { data: sess } = await adminClient
+    .from('attendance_sessions')
+    .select('status')
+    .eq('id', sessionId)
+    .single()
+
+  if (sess?.status === 'ACTIVE') {
+    throw new Error('Cannot delete an active session. Close it first.')
+  }
+
+  await adminClient.from('attendance_records').delete().eq('session_id', sessionId)
+  const { error } = await adminClient.from('attendance_sessions').delete().eq('id', sessionId)
+  if (error) throw new Error(error.message)
+
+  safeRevalidate('/admin/sessions')
+  safeRevalidate('/faculty')
+  return { success: true }
+}
+
+/**
+ * Returns all attendance records for a session, formatted for CSV export.
+ */
+export async function getSessionAttendanceForExport(sessionId: string) {
+  const adminClient = createAdminClient()
+
+  const { data: sess } = await adminClient
+    .from('attendance_sessions')
+    .select('*, subject:subjects(code, name), faculty:faculty_profiles(name)')
+    .eq('id', sessionId)
+    .single()
+
+  const { data: records } = await adminClient
+    .from('attendance_records')
+    .select('*, student:student_profiles(roll_number, name, email, derived_program, derived_department, derived_year)')
+    .eq('session_id', sessionId)
+    .order('scanned_at', { ascending: true })
+
+  return {
+    sessionId,
+    subjectCode: (sess?.subject as unknown as { code: string })?.code || '',
+    subjectName: (sess?.subject as unknown as { name: string })?.name || '',
+    facultyName: (sess?.faculty as unknown as { name: string })?.name || '',
+    startedAt: sess?.started_at || '',
+    closedAt: sess?.closed_at || '',
+    records: records?.map((r) => {
+      const student = r.student as unknown as {
+        roll_number: string; name: string; email?: string;
+        derived_program?: string; derived_department?: string; derived_year?: string
+      }
+      return {
+        rollNumber: student?.roll_number || '',
+        name: student?.name || '',
+        email: student?.email || '',
+        program: student?.derived_program || '',
+        department: student?.derived_department || '',
+        year: student?.derived_year || '',
+        scannedAt: r.scanned_at,
+      }
+    }) || [],
+  }
 }
 
 export async function getLiveQRToken(sessionId: string): Promise<{ token: string; expiresAt: number } | null> {
@@ -839,4 +913,82 @@ export async function getStudentDashboardData(studentId?: string) {
         subjectName: (r.session as unknown as { subject: { name: string } })?.subject?.name || '',
       })) || [],
   }
+}
+
+// ─── STUDENT CRUD ACTIONS ────────────────────────────────────────────────────
+
+export async function deleteStudent(studentId: string) {
+  const session = await getSession()
+  if (session?.role !== 'SUPER_ADMIN') {
+    throw new Error('Unauthorized: Only Super Admin can delete students')
+  }
+
+  const adminClient = createAdminClient()
+
+  // Cascade: delete attendance records, enrollments, profile, role
+  await adminClient.from('attendance_records').delete().eq('student_id', studentId)
+  await adminClient.from('enrollments').delete().eq('student_id', studentId)
+  await adminClient.from('student_profiles').delete().eq('id', studentId)
+  await adminClient.from('users_roles').delete().eq('id', studentId)
+
+  safeRevalidate('/admin/students')
+  return { success: true }
+}
+
+export async function updateStudent(
+  studentId: string,
+  updates: { name?: string; email?: string }
+) {
+  const session = await getSession()
+  if (session?.role !== 'SUPER_ADMIN') {
+    throw new Error('Unauthorized: Only Super Admin can edit students')
+  }
+
+  const adminClient = createAdminClient()
+  const { error } = await adminClient
+    .from('student_profiles')
+    .update({
+      ...(updates.name ? { name: updates.name.trim() } : {}),
+      ...(updates.email ? { email: updates.email.trim().toLowerCase() } : {}),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', studentId)
+
+  if (error) throw new Error(error.message)
+
+  safeRevalidate('/admin/students')
+  return { success: true }
+}
+
+export async function unenrollStudent(studentId: string, subjectId: string) {
+  const session = await getSession()
+  if (!session || (session.role !== 'SUPER_ADMIN' && session.role !== 'FACULTY')) {
+    throw new Error('Unauthorized')
+  }
+
+  const adminClient = createAdminClient()
+
+  // If faculty, verify they own the subject
+  if (session.role === 'FACULTY') {
+    const { data: subject } = await adminClient
+      .from('subjects')
+      .select('faculty_id')
+      .eq('id', subjectId)
+      .single()
+    if (subject?.faculty_id !== session.userId) {
+      throw new Error('Unauthorized: You can only manage your own subjects')
+    }
+  }
+
+  const { error } = await adminClient
+    .from('enrollments')
+    .delete()
+    .eq('student_id', studentId)
+    .eq('subject_id', subjectId)
+
+  if (error) throw new Error(error.message)
+
+  safeRevalidate(`/faculty/subjects/${subjectId}/roster`)
+  safeRevalidate('/admin/students')
+  return { success: true }
 }

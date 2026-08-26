@@ -120,7 +120,7 @@ export function AuthLoginForm({ role }: AuthLoginFormProps) {
               )}
               {isStudent && (
                 <div className="p-3 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg">
-                  <strong>Students:</strong> If you don't have a password, please use Google Sign-In with your institutional email.
+                  <strong>Students:</strong> Your institutional email is <code>rollnumber@nitrkl.ac.in</code> (e.g. <code>626ec6002@nitrkl.ac.in</code>). Use Google Sign-In or enter your credentials below.
                 </div>
               )}
               <div>
@@ -131,7 +131,7 @@ export function AuthLoginForm({ role }: AuthLoginFormProps) {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder={isStudent ? 'your@email.com' : 'faculty@institution.ac.in'}
+                  placeholder={isStudent ? '626ec6002@nitrkl.ac.in' : 'faculty@nitrkl.ac.in'}
                   required
                   className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900 transition-colors"
                 />

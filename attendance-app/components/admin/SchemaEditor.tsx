@@ -1,23 +1,85 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { RollSchemaConfig, ParsedRollNumber } from '@/lib/types'
-import { parseRollNumber, DEFAULT_INSTITUTIONAL_SCHEMA } from '@/lib/schema-parser'
+import { RollSchemaConfig, RollSchemaSegment } from '@/lib/types'
+import { DEFAULT_INSTITUTIONAL_SCHEMA } from '@/lib/schema-parser'
 import { updateInstitutionalRollSchema } from '@/lib/actions'
-import { CheckCircle2, RefreshCw, Sparkles, AlertCircle } from 'lucide-react'
+import {
+  CheckCircle2,
+  RefreshCw,
+  Sparkles,
+  AlertCircle,
+  Plus,
+  Trash2,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react'
 
 interface SchemaEditorProps {
   initialConfig?: RollSchemaConfig
 }
 
+type SegmentType = 'numeric' | 'alphanumeric' | 'alpha'
+
 export function SchemaEditor({ initialConfig = DEFAULT_INSTITUTIONAL_SCHEMA }: SchemaEditorProps) {
-  const [config] = useState<RollSchemaConfig>(initialConfig)
+  const [config, setConfig] = useState<RollSchemaConfig>(initialConfig)
   const [testRoll, setTestRoll] = useState('626EC6002')
   const [isPending, startTransition] = useTransition()
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [expandedSegment, setExpandedSegment] = useState<number | null>(null)
 
-  const parsedTestResult: ParsedRollNumber = parseRollNumber(testRoll, config)
+  // ─── Segment-level helpers ─────────────────────────────────────────────────
+
+  const updateSegment = (idx: number, patch: Partial<RollSchemaSegment>) => {
+    setConfig((prev) => ({
+      segments: prev.segments.map((s, i) => (i === idx ? { ...s, ...patch } : s)),
+    }))
+  }
+
+  const addSegment = () => {
+    const newSeg: RollSchemaSegment = {
+      name: 'New Segment',
+      key: `segment_${Date.now()}`,
+      length: 1,
+      type: 'alphanumeric',
+      description: '',
+    }
+    setConfig((prev) => ({ segments: [...prev.segments, newSeg] }))
+    setExpandedSegment(config.segments.length)
+  }
+
+  const removeSegment = (idx: number) => {
+    if (!confirm('Remove this segment from the schema?')) return
+    setConfig((prev) => ({ segments: prev.segments.filter((_, i) => i !== idx) }))
+    setExpandedSegment(null)
+  }
+
+  const addMapping = (segIdx: number) => {
+    const seg = config.segments[segIdx]
+    const existing = seg.mappings || {}
+    const newKey = prompt('Enter the code/key (e.g. "6" or "EC"):')
+    if (!newKey) return
+    const newVal = prompt(`Enter the label for "${newKey}":`)
+    if (!newVal) return
+    updateSegment(segIdx, { mappings: { ...existing, [newKey.trim()]: newVal.trim() } })
+  }
+
+  const removeMapping = (segIdx: number, code: string) => {
+    const seg = config.segments[segIdx]
+    if (!seg.mappings) return
+    const updated = { ...seg.mappings }
+    delete updated[code]
+    updateSegment(segIdx, {
+      mappings: Object.keys(updated).length > 0 ? updated : undefined,
+    })
+  }
+
+  const updateMappingValue = (segIdx: number, code: string, value: string) => {
+    const seg = config.segments[segIdx]
+    if (!seg.mappings) return
+    updateSegment(segIdx, { mappings: { ...seg.mappings, [code]: value } })
+  }
 
   const handleSaveSchema = () => {
     startTransition(async () => {
@@ -50,51 +112,38 @@ export function SchemaEditor({ initialConfig = DEFAULT_INSTITUTIONAL_SCHEMA }: S
           <label htmlFor="test-roll-input" className="block text-xs font-medium text-slate-700 mb-1">
             Enter Sample Roll Number:
           </label>
-          <div className="flex gap-2">
-            <input
-              id="test-roll-input"
-              type="text"
-              value={testRoll}
-              onChange={(e) => setTestRoll(e.target.value.toUpperCase())}
-              placeholder="e.g. 626EC6002"
-              className="flex-1 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-mono font-bold focus:border-slate-900 focus:outline-none"
-            />
-          </div>
+          <input
+            id="test-roll-input"
+            type="text"
+            value={testRoll}
+            onChange={(e) => setTestRoll(e.target.value.toUpperCase())}
+            placeholder="e.g. 626EC6002"
+            className="flex-1 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-mono font-bold focus:border-slate-900 focus:outline-none w-full"
+          />
         </div>
 
         {/* Live Parse Results Cards */}
         <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-            <div className="text-[11px] font-semibold text-slate-500 uppercase">Degree / Program</div>
-            <div className="mt-1 text-sm font-bold text-slate-900">
-              {parsedTestResult.program || <span className="text-slate-400 font-normal">Unknown</span>}
-            </div>
-            <div className="text-[10px] text-slate-400 mt-0.5">Segment 1 (Pos 1)</div>
-          </div>
-
-          <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-            <div className="text-[11px] font-semibold text-slate-500 uppercase">Admission Year</div>
-            <div className="mt-1 text-sm font-bold text-slate-900">
-              {parsedTestResult.year || <span className="text-slate-400 font-normal">Unknown</span>}
-            </div>
-            <div className="text-[10px] text-slate-400 mt-0.5">Segment 2 (Pos 2-3)</div>
-          </div>
-
-          <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-            <div className="text-[11px] font-semibold text-slate-500 uppercase">Department</div>
-            <div className="mt-1 text-sm font-bold text-slate-900">
-              {parsedTestResult.department || <span className="text-slate-400 font-normal">Unknown</span>}
-            </div>
-            <div className="text-[10px] text-slate-400 mt-0.5">Segment 3 (Pos 4-5)</div>
-          </div>
-
-          <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-            <div className="text-[11px] font-semibold text-slate-500 uppercase">Student Serial</div>
-            <div className="mt-1 text-sm font-mono font-bold text-slate-900">
-              {parsedTestResult.serial || <span className="text-slate-400 font-normal">Unknown</span>}
-            </div>
-            <div className="text-[10px] text-slate-400 mt-0.5">Segment 4 (Remaining)</div>
-          </div>
+          {(() => {
+            // Re-compute raw segments directly from the roll string for accurate display
+            let pos = 0
+            return config.segments.map((seg, idx) => {
+              const raw = testRoll.toUpperCase().slice(pos, pos + seg.length)
+              pos += seg.length
+              const label = seg.mappings?.[raw] || raw || null
+              return (
+                <div key={idx} className="rounded-md border border-slate-200 bg-slate-50 p-3">
+                  <div className="text-[11px] font-semibold text-slate-500 uppercase">{seg.name}</div>
+                  <div className="mt-1 text-sm font-bold text-slate-900">
+                    {label || <span className="text-slate-400 font-normal">Unknown</span>}
+                  </div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">
+                    {seg.description || `Segment ${idx + 1}`}
+                  </div>
+                </div>
+              )
+            })
+          })()}
         </div>
       </div>
 
@@ -106,18 +155,27 @@ export function SchemaEditor({ initialConfig = DEFAULT_INSTITUTIONAL_SCHEMA }: S
               Active Institutional Schema Configuration
             </h3>
             <p className="text-xs text-slate-500">
-              Defines segment positions, character lengths, and human-readable code translations
+              Edit segment names, lengths, types, and code mappings. Changes take effect after saving.
             </p>
           </div>
 
-          <button
-            onClick={handleSaveSchema}
-            disabled={isPending}
-            className="inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50 transition-colors"
-          >
-            {isPending ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
-            Save Schema
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={addSegment}
+              className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add Segment
+            </button>
+            <button
+              onClick={handleSaveSchema}
+              disabled={isPending}
+              className="inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50 transition-colors"
+            >
+              {isPending ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+              Save Schema
+            </button>
+          </div>
         </div>
 
         {successMsg && (
@@ -134,55 +192,145 @@ export function SchemaEditor({ initialConfig = DEFAULT_INSTITUTIONAL_SCHEMA }: S
           </div>
         )}
 
-        <div className="p-5 space-y-4">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs" aria-label="Schema segments">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-semibold uppercase">
-                  <th scope="col" className="px-4 py-2.5">Segment Name</th>
-                  <th scope="col" className="px-4 py-2.5">Length (Chars)</th>
-                  <th scope="col" className="px-4 py-2.5">Type</th>
-                  <th scope="col" className="px-4 py-2.5">Mapped Codes</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {config.segments.map((seg, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50">
-                    <td className="px-4 py-3">
-                      <div className="font-semibold text-slate-900">{seg.name}</div>
-                      <div className="text-[11px] text-slate-500">{seg.description}</div>
-                    </td>
-                    <td className="px-4 py-3 font-mono font-bold text-slate-800">
-                      {seg.length}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="rounded bg-slate-100 px-2 py-0.5 font-mono text-[11px] text-slate-700">
-                        {seg.type}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">
-                      {seg.mappings ? (
-                        <div className="flex flex-wrap gap-1 max-w-md">
-                          {Object.entries(seg.mappings).slice(0, 6).map(([code, label]) => (
-                            <span key={code} className="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-100 text-[10px] text-slate-700">
-                              <strong className="mr-1">{code}:</strong> {label}
-                            </span>
-                          ))}
-                          {Object.keys(seg.mappings).length > 6 && (
-                            <span className="text-[10px] text-slate-400">
-                              +{Object.keys(seg.mappings).length - 6} more
-                            </span>
-                          )}
+        <div className="divide-y divide-slate-100">
+          {config.segments.map((seg, idx) => (
+            <div key={idx} className="p-4">
+              {/* Segment Header Row */}
+              <div className="flex items-center gap-3">
+                <div className="flex-1 grid grid-cols-1 sm:grid-cols-4 gap-3">
+                  {/* Name */}
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">
+                      Segment Name
+                    </label>
+                    <input
+                      type="text"
+                      value={seg.name}
+                      onChange={(e) => updateSegment(idx, { name: e.target.value })}
+                      className="w-full rounded border border-slate-300 px-2 py-1.5 text-xs font-semibold focus:border-slate-900 focus:outline-none"
+                    />
+                  </div>
+                  {/* Description */}
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">
+                      Description
+                    </label>
+                    <input
+                      type="text"
+                      value={seg.description || ''}
+                      onChange={(e) => updateSegment(idx, { description: e.target.value })}
+                      placeholder="Optional hint"
+                      className="w-full rounded border border-slate-300 px-2 py-1.5 text-xs focus:border-slate-900 focus:outline-none"
+                    />
+                  </div>
+                  {/* Length */}
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">
+                      Length (chars)
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={seg.length}
+                      onChange={(e) => updateSegment(idx, { length: parseInt(e.target.value) || 1 })}
+                      className="w-full rounded border border-slate-300 px-2 py-1.5 text-xs font-mono font-bold focus:border-slate-900 focus:outline-none"
+                    />
+                  </div>
+                  {/* Type */}
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">
+                      Type
+                    </label>
+                    <select
+                      value={seg.type}
+                      onChange={(e) => updateSegment(idx, { type: e.target.value as SegmentType })}
+                      className="w-full rounded border border-slate-300 px-2 py-1.5 text-xs bg-white focus:border-slate-900 focus:outline-none"
+                    >
+                      <option value="numeric">numeric</option>
+                      <option value="alpha">alpha</option>
+                      <option value="alphanumeric">alphanumeric</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Expand / Delete */}
+                <div className="flex items-center gap-1.5 mt-3 sm:mt-0 shrink-0 self-end">
+                  <button
+                    onClick={() => setExpandedSegment(expandedSegment === idx ? null : idx)}
+                    title={expandedSegment === idx ? 'Collapse mappings' : 'Edit code mappings'}
+                    className="inline-flex items-center gap-1 rounded border border-slate-300 px-2.5 py-1.5 text-[11px] font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+                  >
+                    {expandedSegment === idx ? (
+                      <ChevronUp className="h-3.5 w-3.5" />
+                    ) : (
+                      <ChevronDown className="h-3.5 w-3.5" />
+                    )}
+                    {seg.mappings ? `${Object.keys(seg.mappings).length} mappings` : 'No mappings'}
+                  </button>
+                  <button
+                    onClick={() => removeSegment(idx)}
+                    title="Remove this segment"
+                    className="inline-flex items-center rounded border border-red-200 bg-red-50 px-2 py-1.5 text-[11px] text-red-600 hover:bg-red-100 transition-colors"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Expanded Mappings Editor */}
+              {expandedSegment === idx && (
+                <div className="mt-4 rounded-lg bg-slate-50 border border-slate-200 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-semibold text-slate-700">
+                      Code → Label Mappings
+                    </h4>
+                    <button
+                      onClick={() => addMapping(idx)}
+                      className="inline-flex items-center gap-1 rounded bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-slate-800 transition-colors"
+                    >
+                      <Plus className="h-3 w-3" /> Add Mapping
+                    </button>
+                  </div>
+                  {!seg.mappings || Object.keys(seg.mappings).length === 0 ? (
+                    <p className="text-[11px] text-slate-400 italic">
+                      No mappings — segment value will be used directly as-is.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {Object.entries(seg.mappings).map(([code, label]) => (
+                        <div key={code} className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-slate-900 bg-white border border-slate-200 px-2.5 py-1 rounded text-xs min-w-[60px] text-center">
+                            {code}
+                          </span>
+                          <span className="text-slate-400 text-xs">→</span>
+                          <input
+                            type="text"
+                            value={label}
+                            onChange={(e) => updateMappingValue(idx, code, e.target.value)}
+                            className="flex-1 rounded border border-slate-300 bg-white px-2 py-1 text-xs focus:border-slate-900 focus:outline-none"
+                          />
+                          <button
+                            onClick={() => removeMapping(idx, code)}
+                            title="Remove this mapping"
+                            className="inline-flex items-center rounded p-1 text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
                         </div>
-                      ) : (
-                        <span className="text-slate-400">Direct Value</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+
+          {config.segments.length === 0 && (
+            <div className="p-8 text-center text-xs text-slate-400">
+              No segments defined. Click &quot;Add Segment&quot; to start building your schema.
+            </div>
+          )}
         </div>
       </div>
     </div>

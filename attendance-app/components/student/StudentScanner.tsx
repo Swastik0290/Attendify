@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Html5QrcodeScanner, Html5QrcodeSupportedFormats } from 'html5-qrcode'
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode'
 import {
   CheckCircle2,
   AlertTriangle,
@@ -10,6 +10,7 @@ import {
   Camera,
   RefreshCw,
   ArrowLeft,
+  ShieldAlert,
 } from 'lucide-react'
 import { submitAttendanceScan, ScanAttendanceResult } from '@/lib/actions'
 import { getAuthenticationOptions, verifyAuthentication } from '@/lib/passkey-actions'
@@ -17,12 +18,16 @@ import { startAuthentication } from '@simplewebauthn/browser'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 
+type CameraState = 'idle' | 'requesting' | 'granted' | 'denied' | 'error'
+
 export function StudentScanner() {
   const [scanResult, setScanResult] = useState<ScanAttendanceResult | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [manualTokenInput, setManualTokenInput] = useState('')
-  const scannerRef = useRef<Html5QrcodeScanner | null>(null)
-  const isMountedRef = useRef(false)
+  const [cameraState, setCameraState] = useState<CameraState>('idle')
+  const [cameraError, setCameraError] = useState<string>('')
+  const scannerRef = useRef<Html5Qrcode | null>(null)
+  const isScanningRef = useRef(false)
 
   const searchParams = useSearchParams()
   const urlToken = searchParams.get('token')
@@ -31,12 +36,20 @@ export function StudentScanner() {
     if (isProcessing) return
     setIsProcessing(true)
 
+    // Stop the camera once we've got a scan
+    if (scannerRef.current && isScanningRef.current) {
+      try {
+        await scannerRef.current.stop()
+        isScanningRef.current = false
+      } catch { /* ignore */ }
+    }
+
     let tokenToSubmit = data
     if (data.startsWith('http')) {
       try {
         const url = new URL(data)
         tokenToSubmit = url.searchParams.get('token') || data
-      } catch (e) {}
+      } catch { /* ignore */ }
     }
 
     try {
@@ -44,27 +57,25 @@ export function StudentScanner() {
         navigator.vibrate(100)
       }
 
-      // Passkey Verification Step
+      // Passkey Verification Step (optional — only if passkeys are registered)
       try {
         const options = await getAuthenticationOptions()
         if (options.allowCredentials && options.allowCredentials.length > 0) {
-          const authResp = await startAuthentication({ optionsJSON: options as any })
+          const authResp = await startAuthentication({ optionsJSON: options as Parameters<typeof startAuthentication>[0]['optionsJSON'] })
           const verification = await verifyAuthentication(authResp)
           if (!verification.success) {
             throw new Error('Biometric verification failed. Please try again.')
           }
         }
-      } catch (err: any) {
-        if (err.name === 'NotAllowedError') {
+      } catch (err: unknown) {
+        const e = err as Error
+        if (e.name === 'NotAllowedError') {
           throw new Error('Biometric verification cancelled.')
         }
-        // If they have no passkey, options will have empty allowCredentials and we just proceed normally,
-        // unless startAuthentication throws another error which we bubble up.
-        // Wait, if it fails for other reasons, let's just log it and proceed for V1 if we don't strictly enforce.
-        // But for "strengthening identity", if they registered a passkey, we MUST enforce it.
-        if (err.message && err.message.includes('Biometric')) {
-            throw err
+        if (e.message && e.message.includes('Biometric')) {
+          throw err
         }
+        // No passkey registered — proceed normally
       }
 
       const result = await submitAttendanceScan(tokenToSubmit)
@@ -80,50 +91,89 @@ export function StudentScanner() {
     }
   }, [isProcessing])
 
+  // If a token came in the URL (from camera-app redirect), process it immediately
   useEffect(() => {
-    if (urlToken && !isMountedRef.current) {
+    if (urlToken) {
       handleProcessScannedData(urlToken)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlToken])
 
-    if (!isMountedRef.current && typeof window !== 'undefined') {
-      isMountedRef.current = true
-      // Don't auto-start camera if we already have a token from URL
-      if (!urlToken) {
-        try {
-        const scanner = new Html5QrcodeScanner(
-          'qr-reader-container',
+  const startCamera = useCallback(async () => {
+    if (cameraState === 'requesting' || cameraState === 'granted') return
+    setCameraState('requesting')
+    setCameraError('')
+
+    try {
+      // Explicitly request camera permission first so the browser shows the prompt
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+      // Immediately stop the test stream — Html5Qrcode will open its own
+      stream.getTracks().forEach(t => t.stop())
+      setCameraState('granted')
+    } catch (err: unknown) {
+      const e = err as Error
+      if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+        setCameraState('denied')
+        setCameraError('Camera access denied. Please allow camera access in your browser settings and try again.')
+      } else if (e.name === 'NotFoundError') {
+        setCameraState('error')
+        setCameraError('No camera found on this device.')
+      } else {
+        setCameraState('error')
+        setCameraError(`Camera error: ${e.message || 'Unknown error'}`)
+      }
+    }
+  }, [cameraState])
+
+  // Once permission is granted, start the Html5Qrcode scanner
+  useEffect(() => {
+    if (cameraState !== 'granted' || isScanningRef.current || scanResult) return
+
+    const containerId = 'qr-reader-container'
+
+    // Small delay to ensure DOM element is ready
+    const timer = setTimeout(async () => {
+      try {
+        const scanner = new Html5Qrcode(containerId, {
+          formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+          verbose: false,
+        })
+        scannerRef.current = scanner
+
+        await scanner.start(
+          { facingMode: 'environment' },
           {
-            fps: 10,
-            qrbox: { width: 250, height: 250 },
-            formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
-            rememberLastUsedCamera: true,
+            fps: 12,
+            qrbox: { width: 240, height: 240 },
             aspectRatio: 1.0,
           },
-          false
-        )
-
-        scanner.render(
           (decodedText: string) => {
             handleProcessScannedData(decodedText)
           },
           () => {
-            // Ignore scan errors while seeking
+            // Ignore per-frame errors while seeking
           }
         )
+        isScanningRef.current = true
+      } catch (err: unknown) {
+        const e = err as Error
+        setCameraState('error')
+        setCameraError(`Could not start QR scanner: ${e.message || 'Unknown error'}`)
+      }
+    }, 100)
 
-        scannerRef.current = scanner
-      } catch (err) {
-        console.error('QR scanner initialization error:', err)
+    return () => clearTimeout(timer)
+  }, [cameraState, scanResult, handleProcessScannedData])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (scannerRef.current && isScanningRef.current) {
+        scannerRef.current.stop().catch(() => {})
+        isScanningRef.current = false
       }
     }
-  }
-
-  return () => {
-      if (scannerRef.current) {
-        scannerRef.current.clear().catch(console.error)
-      }
-    }
-  }, [handleProcessScannedData, urlToken])
+  }, [])
 
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -134,6 +184,9 @@ export function StudentScanner() {
   const handleResetScan = () => {
     setScanResult(null)
     setManualTokenInput('')
+    // Restart camera after reset
+    setCameraState('idle')
+    isScanningRef.current = false
   }
 
   return (
@@ -245,25 +298,85 @@ export function StudentScanner() {
               Point your phone camera at the active rotating QR on the classroom projector.
             </p>
 
-            {/* Html5Qrcode Scanner Container */}
+            {/* Camera Viewport */}
             <div className="mt-4 overflow-hidden rounded-xl bg-slate-950 min-h-[300px] flex items-center justify-center relative">
-              <div id="qr-reader-container" className="w-full text-white" />
+              {/* Hidden until camera is active */}
+              <div
+                id="qr-reader-container"
+                className={`w-full ${cameraState === 'granted' ? 'block' : 'hidden'}`}
+              />
+
+              {/* Idle: prompt user to tap */}
+              {cameraState === 'idle' && !urlToken && (
+                <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                  <div className="mx-auto h-16 w-16 rounded-full bg-slate-800 flex items-center justify-center mb-4 ring-4 ring-slate-700">
+                    <Camera className="h-8 w-8 text-emerald-400" />
+                  </div>
+                  <p className="text-sm font-semibold text-slate-200 mb-1">Camera Access Required</p>
+                  <p className="text-xs text-slate-400 mb-5 max-w-xs">
+                    Tap below to allow camera access so you can scan the QR code displayed in the classroom.
+                  </p>
+                  <button
+                    onClick={startCamera}
+                    className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 px-6 py-3 text-sm font-bold text-white transition-colors shadow-lg"
+                  >
+                    <Camera className="h-4 w-4" />
+                    Allow Camera &amp; Scan
+                  </button>
+                </div>
+              )}
+
+              {/* Requesting: show spinner */}
+              {cameraState === 'requesting' && (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <RefreshCw className="h-8 w-8 text-emerald-400 animate-spin mb-3" />
+                  <p className="text-xs text-slate-300">Requesting camera access…</p>
+                  <p className="text-[11px] text-slate-500 mt-1">Check the browser permission prompt above.</p>
+                </div>
+              )}
+
+              {/* Denied / Error */}
+              {(cameraState === 'denied' || cameraState === 'error') && (
+                <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
+                  <ShieldAlert className="h-10 w-10 text-red-400 mb-3" />
+                  <p className="text-sm font-semibold text-red-300 mb-1">
+                    {cameraState === 'denied' ? 'Camera Access Denied' : 'Camera Error'}
+                  </p>
+                  <p className="text-xs text-slate-400 max-w-xs mb-4">{cameraError}</p>
+                  <button
+                    onClick={() => { setCameraState('idle'); setCameraError('') }}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 px-4 py-2 text-xs font-semibold text-white transition-colors"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" /> Try Again
+                  </button>
+                </div>
+              )}
+
+              {/* Processing overlay */}
               {isProcessing && (
-                <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-xs flex flex-col items-center justify-center text-white z-20">
+                <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center text-white z-20">
                   <RefreshCw className="h-8 w-8 animate-spin text-emerald-400 mb-2" />
                   <span className="text-xs font-semibold">Verifying cryptographic signature...</span>
+                </div>
+              )}
+
+              {/* Processing from URL token */}
+              {urlToken && !scanResult && cameraState === 'idle' && (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <RefreshCw className="h-8 w-8 text-emerald-400 animate-spin mb-3" />
+                  <p className="text-xs text-slate-300">Verifying attendance token…</p>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Desktop Testing Fallback: Token Input */}
+          {/* Desktop / Manual Token Fallback */}
           <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3.5 text-xs text-slate-600">
             <div className="font-semibold text-slate-800 flex items-center gap-1.5 mb-1.5">
-              <Sparkles className="h-3.5 w-3.5 text-amber-500" /> Desktop / Emulator Testing Fallback
+              <Sparkles className="h-3.5 w-3.5 text-amber-500" /> Desktop / Testing Fallback
             </div>
             <p className="text-[11px] text-slate-500 mb-2">
-              If camera access is unavailable in automated tests or desktop, paste the QR token below:
+              If camera access is unavailable, paste the QR token below:
             </p>
             <form onSubmit={handleManualSubmit} className="flex gap-2">
               <input

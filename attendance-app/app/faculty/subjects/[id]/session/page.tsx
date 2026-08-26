@@ -1,11 +1,11 @@
 import type { Metadata } from 'next'
-import { getSubjectsList, startAttendanceSession, getAttendanceSessionsList } from '@/lib/actions'
-import { LiveQRSession } from '@/components/faculty/LiveQRSession'
+import { getSubjectsList, getAttendanceSessionsList } from '@/lib/actions'
+import { StartSessionView } from '@/components/faculty/StartSessionView'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
-export const metadata: Metadata = { title: 'Live Attendance Session' }
+export const metadata: Metadata = { title: 'Attendance Session' }
 
 export default async function FacultyLiveSessionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -16,20 +16,9 @@ export default async function FacultyLiveSessionPage({ params }: { params: Promi
     notFound()
   }
 
-  // Check if an active session already exists or launch a new one
+  // Check if an active session already exists for this subject (don't auto-start one)
   const sessions = await getAttendanceSessionsList()
-  let activeSession = sessions.find((s) => s.subject_id === id && s.status === 'ACTIVE')
-
-  if (!activeSession) {
-    const res = await startAttendanceSession(id)
-    activeSession = {
-      id: res.sessionId,
-      subject_id: id,
-      faculty_id: currentSubject.faculty_id,
-      status: 'ACTIVE',
-      started_at: new Date().toISOString(),
-    }
-  }
+  const existingActiveSession = sessions.find((s) => s.subject_id === id && s.status === 'ACTIVE') ?? null
 
   return (
     <main className="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
@@ -40,10 +29,11 @@ export default async function FacultyLiveSessionPage({ params }: { params: Promi
         <ArrowLeft className="h-4 w-4" /> Back to Faculty Dashboard
       </Link>
 
-      <LiveQRSession
-        sessionId={activeSession.id}
+      <StartSessionView
+        subjectId={currentSubject.id}
         subjectCode={currentSubject.code}
         subjectName={currentSubject.name}
+        existingActiveSession={existingActiveSession}
       />
     </main>
   )

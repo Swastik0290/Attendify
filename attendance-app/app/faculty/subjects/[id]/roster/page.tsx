@@ -1,7 +1,8 @@
 import type { Metadata } from 'next'
 import { getSubjectsList, getEnrolledStudentsForSubject } from '@/lib/actions'
 import { RosterUploader } from '@/components/admin/RosterUploader'
-import { ArrowLeft, Users, GraduationCap } from 'lucide-react'
+import { RosterStudentTable } from '@/components/faculty/RosterStudentTable'
+import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
@@ -55,53 +56,11 @@ export default async function SubjectRosterPage({ params }: { params: Promise<{ 
         existingStudents={enrolledStudents}
       />
 
-      {/* Enrolled Students Table */}
-      <div className="rounded-xl border border-slate-200 bg-white shadow-xs overflow-hidden">
-        <div className="border-b border-slate-200 px-5 py-3.5 flex justify-between items-center bg-slate-50/75">
-          <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-            <Users className="h-4 w-4 text-slate-700" /> Enrolled Students ({enrolledStudents.length})
-          </h2>
-          <span className="text-xs text-slate-500">Subject: {currentSubject.code}</span>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs" aria-label="Enrolled students">
-            <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-semibold uppercase">
-                <th scope="col" className="px-5 py-2.5">Roll Number</th>
-                <th scope="col" className="px-5 py-2.5">Student Name</th>
-                <th scope="col" className="px-4 py-2.5">Program</th>
-                <th scope="col" className="px-4 py-2.5">Department</th>
-                <th scope="col" className="px-4 py-2.5">Year</th>
-                <th scope="col" className="px-4 py-2.5">Serial</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {enrolledStudents.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-5 py-10 text-center text-slate-400">
-                    <GraduationCap className="h-8 w-8 mx-auto text-slate-300 mb-2" />
-                    No students currently enrolled in this subject. Upload a roster above.
-                  </td>
-                </tr>
-              ) : (
-                enrolledStudents.map((student) => (
-                  <tr key={student.id} className="hover:bg-slate-50">
-                    <td className="px-5 py-3 font-mono font-bold text-slate-900">
-                      {student.roll_number}
-                    </td>
-                    <td className="px-5 py-3 font-medium text-slate-900">{student.name}</td>
-                    <td className="px-4 py-3 text-slate-600">{student.derived_program || '—'}</td>
-                    <td className="px-4 py-3 text-slate-600">{student.derived_department || '—'}</td>
-                    <td className="px-4 py-3 text-slate-600 font-mono">{student.derived_year || '—'}</td>
-                    <td className="px-4 py-3 text-slate-600 font-mono">{student.derived_serial || '—'}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {/* Enrolled Students Table with Unenroll */}
+      <RosterStudentTable
+        subjectId={currentSubject.id}
+        initialStudents={enrolledStudents}
+      />
     </main>
   )
 }

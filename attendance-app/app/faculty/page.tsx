@@ -4,6 +4,7 @@ import { getSubjectsList, getAttendanceSessionsList, signOut } from '@/lib/actio
 import { SubjectsManager } from '@/components/admin/SubjectsManager'
 import { AuthLoginForm } from '@/components/AuthLoginForm'
 import { FacultyRegistrationForm } from '@/components/faculty/FacultyRegistrationForm'
+import { DownloadAttendanceButton } from '@/components/DownloadAttendanceButton'
 import { UserCheck, Clock, CalendarCheck, Shield, LogOut } from 'lucide-react'
 import Link from 'next/link'
 
@@ -148,14 +149,22 @@ export default async function FacultyDashboardPage() {
                       {sess.present_count || 0} Present
                     </td>
                     <td className="px-5 py-3 text-right">
-                      {sess.status === 'ACTIVE' && (
-                        <Link
-                          href={`/faculty/subjects/${sess.subject_id}/session`}
-                          className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 hover:text-emerald-800"
-                        >
-                          View Live QR →
-                        </Link>
-                      )}
+                      <div className="flex items-center justify-end gap-2">
+                        {sess.status === 'ACTIVE' && (
+                          <Link
+                            href={`/faculty/subjects/${sess.subject_id}/session`}
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 hover:text-emerald-800"
+                          >
+                            View Live QR →
+                          </Link>
+                        )}
+                        {sess.status === 'CLOSED' && (
+                          <DownloadAttendanceButton
+                            sessionId={sess.id}
+                            subjectCode={sess.subject?.code}
+                          />
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))

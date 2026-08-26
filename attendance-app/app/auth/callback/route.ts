@@ -44,70 +44,117 @@ export async function GET(request: Request) {
 
   if (facultyByEmail) {
     // Relink this Google auth ID to the existing faculty profile
-    // Move the faculty_profile row to point to new auth ID
-    // (This handles: admin pre-created faculty, now they log in via Google)
     await adminClient.from('users_roles').upsert({ id: user.id, role: 'FACULTY' })
-    // Update faculty_profiles if id changed
     if (facultyByEmail.id !== user.id) {
-      // Remap: update references then profile id
       await adminClient
         .from('faculty_profiles')
         .update({ id: user.id })
         .eq('id', facultyByEmail.id)
+      // Clean up the old placeholder auth user if it was a system-created one
+      try {
+        await adminClient.auth.admin.deleteUser(facultyByEmail.id)
+      } catch {
+        // Old ID may not exist or may be a real user — ignore
+      }
     }
     return redirectTo(origin, '/faculty', request)
   }
 
-  // 2. Check if they match a student_profiles entry by email
+  // 2. Check if they match a student_profiles entry by exact email match
   const { data: studentByEmail } = await adminClient
     .from('student_profiles')
-    .select('id, roll_number')
+    .select('id, roll_number, email')
     .eq('email', email)
     .single()
 
-  if (studentByEmail && studentByEmail.id !== user.id) {
-    // Student was pre-created by roster import — relink to their real Google Auth ID
-    // We need to: create a users_roles for the new id, update student_profiles.id
-    // But student_profiles.id is a FK to users_roles.id, so we need a transaction-style approach
+  if (studentByEmail) {
+    return await relinkStudentAndRedirect(
+      adminClient, user, studentByEmail, origin, request
+    )
+  }
 
-    // 1. Create users_roles for new auth id
+  // 3. Fallback: if email is rollnumber@nitrkl.ac.in, look up by roll number
+  if (email.endsWith('@nitrkl.ac.in')) {
+    const rollFromEmail = email.split('@')[0].toUpperCase()
+    const { data: studentByRoll } = await adminClient
+      .from('student_profiles')
+      .select('id, roll_number, email')
+      .eq('roll_number', rollFromEmail)
+      .single()
+
+    if (studentByRoll) {
+      return await relinkStudentAndRedirect(
+        adminClient, user, studentByRoll, origin, request
+      )
+    }
+  }
+
+  // 4. Brand new user — default to STUDENT
+  await adminClient.from('users_roles').insert({ id: user.id, role: 'STUDENT' })
+
+  return redirectTo(origin, next === '/' ? '/student' : next, request)
+}
+
+/**
+ * Relinks a pre-created student profile to the newly signed-in user's real auth ID.
+ * Handles cascading FK updates and cleanup of the old placeholder auth user.
+ */
+async function relinkStudentAndRedirect(
+  adminClient: ReturnType<typeof createAdminClient>,
+  user: { id: string; email?: string },
+  studentProfile: { id: string; roll_number: string; email?: string | null },
+  origin: string,
+  request: Request
+) {
+  const { id: oldStudentId } = studentProfile
+
+  if (oldStudentId === user.id) {
+    // Already linked — ensure role exists and route
+    await adminClient.from('users_roles').upsert({ id: user.id, role: 'STUDENT' })
+    return redirectTo(origin, '/student', request)
+  }
+
+  try {
+    // Step 1: Create role for new auth ID
     await adminClient.from('users_roles').upsert({ id: user.id, role: 'STUDENT' })
 
-    // 2. Reassign enrollment and attendance records to new ID before updating profile
+    // Step 2: Reassign related records to new ID
     await adminClient
       .from('enrollments')
       .update({ student_id: user.id })
-      .eq('student_id', studentByEmail.id)
+      .eq('student_id', oldStudentId)
 
     await adminClient
       .from('attendance_records')
       .update({ student_id: user.id })
-      .eq('student_id', studentByEmail.id)
+      .eq('student_id', oldStudentId)
 
-    // 3. Update student_profiles to point to new auth ID
+    // Step 3: Update student_profiles to point to new auth ID + sync real email
     await adminClient
       .from('student_profiles')
-      .update({ id: user.id })
-      .eq('id', studentByEmail.id)
+      .update({
+        id: user.id,
+        // Update email to the actual sign-in email so future lookups work
+        ...(user.email ? { email: user.email.toLowerCase() } : {}),
+      })
+      .eq('id', oldStudentId)
 
-    // 4. Delete the old placeholder users_roles row
-    await adminClient
-      .from('users_roles')
-      .delete()
-      .eq('id', studentByEmail.id)
+    // Step 4: Delete the old placeholder users_roles row
+    await adminClient.from('users_roles').delete().eq('id', oldStudentId)
 
-    return redirectTo(origin, '/student', request)
+    // Step 5: Clean up old placeholder auth user (was system-created with roll@nitrkl.ac.in)
+    try {
+      await adminClient.auth.admin.deleteUser(oldStudentId)
+    } catch {
+      // Ignore — old placeholder user may not exist in auth.users
+    }
+  } catch (err) {
+    console.error('Student profile relink failed:', err)
+    // Even if relink fails, let them sign in as a new student — don't block them
+    await adminClient.from('users_roles').upsert({ id: user.id, role: 'STUDENT' })
   }
 
-  if (studentByEmail && studentByEmail.id === user.id) {
-    // Already linked correctly
-    return redirectTo(origin, '/student', request)
-  }
-
-  // 3. Brand new user — default to STUDENT
-  await adminClient.from('users_roles').insert({ id: user.id, role: 'STUDENT' })
-
-  return redirectTo(origin, next === '/' ? '/student' : next, request)
+  return redirectTo(origin, '/student', request)
 }
 
 function getDestination(role: string, fallback: string): string {

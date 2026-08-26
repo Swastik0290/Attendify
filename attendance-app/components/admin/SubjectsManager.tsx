@@ -172,6 +172,16 @@ export function SubjectsManager({
                             <Trash2 className="h-3 w-3" />
                           </button>
                         )}
+                        {isFacultyView && (
+                          <button
+                            onClick={() => handleDelete(sub.id)}
+                            disabled={isPending}
+                            title="Delete Subject"
+                            className="inline-flex items-center gap-1 rounded bg-red-50 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-100 hover:text-red-700 border border-red-200 transition-colors disabled:opacity-50"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
