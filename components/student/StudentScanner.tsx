@@ -105,10 +105,14 @@ export function StudentScanner() {
     setCameraError('')
 
     try {
-      // Html5Qrcode.getCameras() automatically requests permission if needed 
-      // without locking the hardware stream before the scanner starts.
-      await Html5Qrcode.getCameras()
-      setCameraState('granted')
+      // Explicitly request camera permission first so the browser shows the prompt
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+      // Immediately stop the test stream — Html5Qrcode will open its own
+      stream.getTracks().forEach(t => t.stop())
+      
+      // Add a tiny delay before granting state to ensure hardware releases the stream 
+      // preventing a black screen on iOS Safari.
+      setTimeout(() => setCameraState('granted'), 150)
     } catch (err: unknown) {
       const e = err as Error
       if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
