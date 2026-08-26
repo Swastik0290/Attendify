@@ -4,6 +4,8 @@ import { RosterUploader } from '@/components/admin/RosterUploader'
 import { StudentsTable } from '@/components/admin/StudentsTable'
 import { getStudentsList } from '@/lib/actions'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = { title: 'Students & Roster' }
 
 export default async function StudentsPage() {

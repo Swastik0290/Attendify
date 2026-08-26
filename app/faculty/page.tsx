@@ -1,6 +1,9 @@
 import type { Metadata } from 'next'
 import { getSession } from '@/lib/auth'
 import { getSubjectsList, getAttendanceSessionsList, signOut } from '@/lib/actions'
+
+export const dynamic = 'force-dynamic'
+
 import { SubjectsManager } from '@/components/admin/SubjectsManager'
 import { AuthLoginForm } from '@/components/AuthLoginForm'
 import { FacultyRegistrationForm } from '@/components/faculty/FacultyRegistrationForm'

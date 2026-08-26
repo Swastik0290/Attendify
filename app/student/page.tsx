@@ -5,6 +5,7 @@ import { PasskeyManager } from '@/components/student/PasskeyManager'
 import { GraduationCap, QrCode, CheckCircle2, BookOpen, LogOut, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 
+export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Student Portal' }
 
 export default async function StudentDashboardPage() {

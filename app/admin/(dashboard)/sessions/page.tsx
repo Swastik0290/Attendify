@@ -3,6 +3,8 @@ import { PageHeader } from '@/components/admin/PageHeader'
 import { SessionsTabs } from '@/components/admin/SessionsTabs'
 import { getAttendanceSessionsList } from '@/lib/actions'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = { title: 'Attendance Sessions' }
 
 export default async function SessionsPage() {

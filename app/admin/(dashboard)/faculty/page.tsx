@@ -3,6 +3,8 @@ import { PageHeader } from '@/components/admin/PageHeader'
 import { FacultyTable } from '@/components/admin/FacultyTable'
 import { getFacultyList } from '@/lib/actions'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = { title: 'Faculty' }
 
 export default async function FacultyPage() {

@@ -3,6 +3,7 @@ import { PageHeader } from '@/components/admin/PageHeader'
 import { SubjectsManager } from '@/components/admin/SubjectsManager'
 import { getSubjectsList, getFacultyList } from '@/lib/actions'
 
+export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Subjects' }
 
 export default async function SubjectsPage() {

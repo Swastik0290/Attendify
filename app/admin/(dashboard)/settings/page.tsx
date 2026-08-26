@@ -4,6 +4,7 @@ import { SchemaEditor } from '@/components/admin/SchemaEditor'
 import { getInstitutionalRollSchema } from '@/lib/actions'
 import { Shield, Sliders } from 'lucide-react'
 
+export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Settings & Schema' }
 
 export default async function SettingsPage() {

@@ -331,9 +331,9 @@ export async function getInstitutionalRollSchema(): Promise<RollSchemaConfig> {
     .from('roll_schemas')
     .select('config')
     .eq('is_global', true)
-    .single()
+    .limit(1)
 
-  const config = data?.config as RollSchemaConfig | undefined
+  const config = data?.[0]?.config as RollSchemaConfig | undefined
   if (config?.segments && config.segments.some((s) => s.mappings && Object.keys(s.mappings).length > 0)) {
     return config
   }
@@ -347,9 +347,13 @@ export async function updateInstitutionalRollSchema(config: RollSchemaConfig) {
   }
 
   const adminClient = createAdminClient()
+  
+  // First, delete any existing global schemas to prevent duplication
+  await adminClient.from('roll_schemas').delete().eq('is_global', true)
+
   const { error } = await adminClient
     .from('roll_schemas')
-    .upsert({
+    .insert({
       name: 'Institutional Roll Schema',
       is_global: true,
       config,
