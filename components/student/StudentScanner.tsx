@@ -140,11 +140,21 @@ export function StudentScanner() {
         const scanner = new Html5Qrcode(containerId, {
           formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
           verbose: false,
+          experimentalFeatures: {
+            useBarCodeDetectorIfSupported: true,
+          }
         })
         scannerRef.current = scanner
 
         await scanner.start(
-          { facingMode: 'environment' },
+          { 
+            facingMode: 'environment',
+            // Request highest practical resolution for long distance clarity
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+            // Ask hardware to optically/digitally zoom if the device supports it
+            advanced: [{ zoom: 2.0 }] as any 
+          },
           {
             fps: 30,
             disableFlip: false, // Ensures front/back camera isn't mirrored incorrectly
