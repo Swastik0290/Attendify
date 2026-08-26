@@ -146,8 +146,8 @@ export function StudentScanner() {
         await scanner.start(
           { facingMode: 'environment' },
           {
-            fps: 12,
-            qrbox: { width: 240, height: 240 },
+            fps: 30,
+            disableFlip: false, // Ensures front/back camera isn't mirrored incorrectly
           },
           (decodedText: string) => {
             handleProcessScannedData(decodedText)
