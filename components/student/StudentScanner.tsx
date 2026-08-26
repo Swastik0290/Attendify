@@ -105,10 +105,9 @@ export function StudentScanner() {
     setCameraError('')
 
     try {
-      // Explicitly request camera permission first so the browser shows the prompt
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-      // Immediately stop the test stream — Html5Qrcode will open its own
-      stream.getTracks().forEach(t => t.stop())
+      // Html5Qrcode.getCameras() automatically requests permission if needed 
+      // without locking the hardware stream before the scanner starts.
+      await Html5Qrcode.getCameras()
       setCameraState('granted')
     } catch (err: unknown) {
       const e = err as Error
@@ -145,7 +144,6 @@ export function StudentScanner() {
           {
             fps: 12,
             qrbox: { width: 240, height: 240 },
-            aspectRatio: 1.0,
           },
           (decodedText: string) => {
             handleProcessScannedData(decodedText)

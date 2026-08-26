@@ -148,7 +148,7 @@ export function LiveQRSession({ sessionId, subjectCode, subjectName }: LiveQRSes
                   <QRCodeSVG
                     value={typeof window !== 'undefined' ? `${window.location.origin}/student/scan?token=${token}` : token}
                     size={280}
-                    level="H"
+                    level="L"
                     includeMargin
                     className="mx-auto"
                   />
