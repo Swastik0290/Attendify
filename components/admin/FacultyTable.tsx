@@ -29,6 +29,7 @@ export function FacultyTable({ initialFaculty = [] }: FacultyTableProps) {
   
   const [resetPasswordFacultyId, setResetPasswordFacultyId] = useState<string | null>(null)
   const [resetPassword, setResetPassword] = useState('')
+  const [facultyToDelete, setFacultyToDelete] = useState<string | null>(null)
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
@@ -47,16 +48,17 @@ export function FacultyTable({ initialFaculty = [] }: FacultyTableProps) {
     })
   }
 
-  const handleDeleteFaculty = (facultyId: string) => {
-    if (!confirm('Are you sure you want to completely delete this faculty account? This cannot be undone.')) return
+  const confirmDeleteFaculty = (facultyId: string) => {
     startTransition(async () => {
       try {
         setErrorMsg(null)
         await deleteFaculty(facultyId)
         setFacultyList((prev) => prev.filter((f) => f.id !== facultyId))
         setSuccessMsg('Faculty account deleted.')
+        setFacultyToDelete(null)
       } catch (err: unknown) {
         setErrorMsg(err instanceof Error ? err.message : 'Failed to delete faculty')
+        setFacultyToDelete(null)
       }
     })
   }
@@ -276,7 +278,7 @@ export function FacultyTable({ initialFaculty = [] }: FacultyTableProps) {
                       </button>
 
                       <button
-                        onClick={() => handleDeleteFaculty(faculty.id)}
+                        onClick={() => setFacultyToDelete(faculty.id)}
                         disabled={isPending}
                         title="Delete Faculty"
                         className="inline-flex items-center gap-1 rounded bg-red-50 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-100 hover:text-red-700 border border-red-200 transition-colors disabled:opacity-50"
@@ -438,6 +440,43 @@ export function FacultyTable({ initialFaculty = [] }: FacultyTableProps) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {facultyToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="bg-red-50 px-6 py-4 border-b border-red-100 flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-red-600" />
+              <h3 className="text-sm font-bold text-red-900">Confirm Deletion</h3>
+            </div>
+            <div className="p-6">
+              <p className="text-sm text-slate-700">
+                Are you sure you want to completely delete this faculty account?
+              </p>
+              <p className="text-xs text-slate-500 mt-2">
+                This action cannot be undone.
+              </p>
+              <div className="mt-6 flex justify-end gap-2">
+                <button
+                  onClick={() => setFacultyToDelete(null)}
+                  disabled={isPending}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => confirmDeleteFaculty(facultyToDelete)}
+                  disabled={isPending}
+                  className="rounded-lg bg-red-600 px-5 py-2 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-50 transition-colors flex items-center gap-2"
+                >
+                  {isPending ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                  Delete
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

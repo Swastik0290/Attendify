@@ -16,6 +16,7 @@ export function StudentsTable({ initialStudents }: StudentsTableProps) {
   const [editEmail, setEditEmail] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const [studentToDelete, setStudentToDelete] = useState<{id: string, name: string} | null>(null)
 
   const handleEditStart = (student: StudentProfile) => {
     setEditingId(student.id)
@@ -54,20 +55,16 @@ export function StudentsTable({ initialStudents }: StudentsTableProps) {
     })
   }
 
-  const handleDelete = (studentId: string, name: string) => {
-    if (
-      !confirm(
-        `Delete student "${name}"?\n\nThis will also remove all their enrollment records and attendance history. This action CANNOT be undone.`
-      )
-    )
-      return
+  const confirmDelete = (studentId: string) => {
     startTransition(async () => {
       try {
         setError(null)
         await deleteStudent(studentId)
         setStudents((prev) => prev.filter((s) => s.id !== studentId))
+        setStudentToDelete(null)
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'Delete failed')
+        setStudentToDelete(null)
       }
     })
   }
@@ -182,7 +179,7 @@ export function StudentsTable({ initialStudents }: StudentsTableProps) {
                             Edit
                           </button>
                           <button
-                            onClick={() => handleDelete(student.id, student.name)}
+                            onClick={() => setStudentToDelete({id: student.id, name: student.name})}
                             disabled={isPending}
                             title="Delete student"
                             className="inline-flex items-center gap-1 rounded bg-red-50 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-100 border border-red-200 transition-colors disabled:opacity-50"
@@ -199,6 +196,43 @@ export function StudentsTable({ initialStudents }: StudentsTableProps) {
           </tbody>
         </table>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {studentToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="bg-red-50 px-6 py-4 border-b border-red-100 flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-red-600" />
+              <h3 className="text-sm font-bold text-red-900">Confirm Deletion</h3>
+            </div>
+            <div className="p-6">
+              <p className="text-sm text-slate-700">
+                Are you sure you want to delete student <strong>{studentToDelete.name}</strong>?
+              </p>
+              <p className="text-xs text-slate-500 mt-2">
+                This will permanently remove all their enrollment records and attendance history. This action cannot be undone.
+              </p>
+              <div className="mt-6 flex justify-end gap-2">
+                <button
+                  onClick={() => setStudentToDelete(null)}
+                  disabled={isPending}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => confirmDelete(studentToDelete.id)}
+                  disabled={isPending}
+                  className="rounded-lg bg-red-600 px-5 py-2 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-50 transition-colors flex items-center gap-2"
+                >
+                  {isPending ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

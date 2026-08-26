@@ -28,6 +28,8 @@ export function SchemaEditor({ initialConfig = DEFAULT_INSTITUTIONAL_SCHEMA }: S
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [expandedSegment, setExpandedSegment] = useState<number | null>(null)
+  const [segmentToRemove, setSegmentToRemove] = useState<number | null>(null)
+  const [mappingToAdd, setMappingToAdd] = useState<{segIdx: number, code: string, label: string} | null>(null)
 
   // ─── Segment-level helpers ─────────────────────────────────────────────────
 
@@ -49,20 +51,20 @@ export function SchemaEditor({ initialConfig = DEFAULT_INSTITUTIONAL_SCHEMA }: S
     setExpandedSegment(config.segments.length)
   }
 
-  const removeSegment = (idx: number) => {
-    if (!confirm('Remove this segment from the schema?')) return
-    setConfig((prev) => ({ segments: prev.segments.filter((_, i) => i !== idx) }))
+  const confirmRemoveSegment = () => {
+    if (segmentToRemove === null) return
+    setConfig((prev) => ({ segments: prev.segments.filter((_, i) => i !== segmentToRemove) }))
     setExpandedSegment(null)
+    setSegmentToRemove(null)
   }
 
-  const addMapping = (segIdx: number) => {
-    const seg = config.segments[segIdx]
-    const existing = seg.mappings || {}
-    const newKey = prompt('Enter the code/key (e.g. "6" or "EC"):')
-    if (!newKey) return
-    const newVal = prompt(`Enter the label for "${newKey}":`)
-    if (!newVal) return
-    updateSegment(segIdx, { mappings: { ...existing, [newKey.trim()]: newVal.trim() } })
+  const confirmAddMapping = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!mappingToAdd || !mappingToAdd.code.trim() || !mappingToAdd.label.trim()) return
+    const { segIdx, code, label } = mappingToAdd
+    const existing = config.segments[segIdx].mappings || {}
+    updateSegment(segIdx, { mappings: { ...existing, [code.trim()]: label.trim() } })
+    setMappingToAdd(null)
   }
 
   const removeMapping = (segIdx: number, code: string) => {
@@ -269,7 +271,7 @@ export function SchemaEditor({ initialConfig = DEFAULT_INSTITUTIONAL_SCHEMA }: S
                     {seg.mappings ? `${Object.keys(seg.mappings).length} mappings` : 'No mappings'}
                   </button>
                   <button
-                    onClick={() => removeSegment(idx)}
+                    onClick={() => setSegmentToRemove(idx)}
                     title="Remove this segment"
                     className="inline-flex items-center rounded border border-red-200 bg-red-50 px-2 py-1.5 text-[11px] text-red-600 hover:bg-red-100 transition-colors"
                   >
@@ -286,7 +288,7 @@ export function SchemaEditor({ initialConfig = DEFAULT_INSTITUTIONAL_SCHEMA }: S
                       Code → Label Mappings
                     </h4>
                     <button
-                      onClick={() => addMapping(idx)}
+                      onClick={() => setMappingToAdd({segIdx: idx, code: '', label: ''})}
                       className="inline-flex items-center gap-1 rounded bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-slate-800 transition-colors"
                     >
                       <Plus className="h-3 w-3" /> Add Mapping
@@ -333,6 +335,96 @@ export function SchemaEditor({ initialConfig = DEFAULT_INSTITUTIONAL_SCHEMA }: S
           )}
         </div>
       </div>
+
+      {/* Remove Segment Modal */}
+      {segmentToRemove !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="bg-red-50 px-6 py-4 border-b border-red-100 flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-red-600" />
+              <h3 className="text-sm font-bold text-red-900">Remove Segment</h3>
+            </div>
+            <div className="p-6">
+              <p className="text-sm text-slate-700">
+                Are you sure you want to remove this segment from the schema?
+              </p>
+              <div className="mt-6 flex justify-end gap-2">
+                <button
+                  onClick={() => setSegmentToRemove(null)}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmRemoveSegment}
+                  className="rounded-lg bg-red-600 px-5 py-2 text-xs font-bold text-white hover:bg-red-700 transition-colors flex items-center gap-2"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  Remove
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Mapping Modal */}
+      {mappingToAdd !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="bg-slate-900 px-6 py-4">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <Plus className="h-4 w-4 text-sky-400" /> Add Code Mapping
+              </h3>
+            </div>
+            <form onSubmit={confirmAddMapping} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Code / Key
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. EC"
+                  value={mappingToAdd.code}
+                  onChange={(e) => setMappingToAdd({ ...mappingToAdd, code: e.target.value })}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-900 focus:outline-none"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Label / Description
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Electronics & Comm."
+                  value={mappingToAdd.label}
+                  onChange={(e) => setMappingToAdd({ ...mappingToAdd, label: e.target.value })}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-900 focus:outline-none"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setMappingToAdd(null)}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!mappingToAdd.code.trim() || !mappingToAdd.label.trim()}
+                  className="rounded-lg bg-slate-900 px-5 py-2 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-50 transition-colors"
+                >
+                  Add Mapping
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
