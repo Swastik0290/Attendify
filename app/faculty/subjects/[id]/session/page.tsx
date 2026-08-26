@@ -18,7 +18,18 @@ export default async function FacultyLiveSessionPage({ params }: { params: Promi
 
   // Check if an active session already exists for this subject (don't auto-start one)
   const sessions = await getAttendanceSessionsList()
-  const existingActiveSession = sessions.find((s) => s.subject_id === id && s.status === 'ACTIVE') ?? null
+  
+  const subjectSessions = sessions
+    .filter((s) => s.subject_id === id)
+    .sort((a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime())
+
+  const existingActiveSession = subjectSessions.find((s) => s.status === 'ACTIVE') ?? null
+  
+  const activeSessionNumber = existingActiveSession 
+    ? subjectSessions.findIndex(s => s.id === existingActiveSession.id) + 1
+    : 0
+
+  const nextSessionNumber = subjectSessions.length + 1
 
   return (
     <main className="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
@@ -34,6 +45,8 @@ export default async function FacultyLiveSessionPage({ params }: { params: Promi
         subjectCode={currentSubject.code}
         subjectName={currentSubject.name}
         existingActiveSession={existingActiveSession}
+        activeSessionNumber={activeSessionNumber}
+        nextSessionNumber={nextSessionNumber}
       />
     </main>
   )

@@ -24,9 +24,10 @@ interface LiveQRSessionProps {
   sessionId: string
   subjectCode: string
   subjectName: string
+  sessionNumber: number
 }
 
-export function LiveQRSession({ sessionId, subjectCode, subjectName }: LiveQRSessionProps) {
+export function LiveQRSession({ sessionId, subjectCode, subjectName, sessionNumber }: LiveQRSessionProps) {
   const [token, setToken] = useState<string | null>(null)
   const [countdown, setCountdown] = useState<number>(6)
   const [isSessionActive, setIsSessionActive] = useState(true)
@@ -111,8 +112,8 @@ export function LiveQRSession({ sessionId, subjectCode, subjectName }: LiveQRSes
           <h1 className="text-2xl font-bold tracking-tight">
             {subjectCode} • {subjectName}
           </h1>
-          <p className="text-xs text-slate-400 mt-1 font-mono">
-            Session ID: {sessionId}
+          <p className="text-xs text-slate-400 mt-1 font-mono font-semibold">
+            Class #{sessionNumber}
           </p>
         </div>
 

@@ -11,15 +11,21 @@ interface StartSessionViewProps {
   subjectCode: string
   subjectName: string
   existingActiveSession: AttendanceSession | null
+  activeSessionNumber: number
+  nextSessionNumber: number
 }
 
 export function StartSessionView({
   subjectId,
   subjectCode,
-  subjectName,
   existingActiveSession,
+  activeSessionNumber,
+  nextSessionNumber,
 }: StartSessionViewProps) {
   const [activeSession, setActiveSession] = useState<AttendanceSession | null>(existingActiveSession)
+  const [currentSessionNumber, setCurrentSessionNumber] = useState<number>(
+    existingActiveSession ? activeSessionNumber : nextSessionNumber
+  )
   const [sessionStarted, setSessionStarted] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -41,6 +47,7 @@ export function StartSessionView({
           status: 'ACTIVE',
           started_at: new Date().toISOString(),
         })
+        setCurrentSessionNumber(nextSessionNumber)
         setSessionStarted(true)
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'Failed to start session')
@@ -49,6 +56,7 @@ export function StartSessionView({
   }
 
   const handleResumeExisting = () => {
+    setCurrentSessionNumber(activeSessionNumber)
     setSessionStarted(true)
   }
 
@@ -66,6 +74,7 @@ export function StartSessionView({
           status: 'ACTIVE',
           started_at: new Date().toISOString(),
         })
+        setCurrentSessionNumber(nextSessionNumber)
         setSessionStarted(true)
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'Failed to start session')
@@ -80,6 +89,7 @@ export function StartSessionView({
         sessionId={activeSession.id}
         subjectCode={subjectCode}
         subjectName={subjectName}
+        sessionNumber={currentSessionNumber}
       />
     )
   }
