@@ -43,6 +43,7 @@ export function RosterUploader({
   const [selectedEmailCol, setSelectedEmailCol] = useState<string>('')
   const [validationResult, setValidationResult] = useState<RosterValidationResult | null>(null)
   const [importStatus, setImportStatus] = useState<{ success: boolean; message: string } | null>(null)
+  const [replaceMode, setReplaceMode] = useState<boolean>(false)
   const [isPending, startTransition] = useTransition()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
@@ -103,9 +104,12 @@ export function RosterUploader({
         // React Server Actions cannot serialize `undefined` values within objects,
         // so we sanitize the payload by stringifying & parsing it first.
         const payload = JSON.parse(JSON.stringify(validationResult.validRows))
-        const res = await importStudentRoster(payload, subjectId)
+        const res = await importStudentRoster(payload, subjectId, replaceMode)
         if (res.success) {
-          const successMsg = `Successfully imported ${res.importedCount} new, updated ${res.updatedCount || 0} existing profiles, and created ${res.enrolledCount} enrollments!`
+          let successMsg = `Successfully imported ${res.importedCount} new, updated ${res.updatedCount || 0} existing profiles, and created ${res.enrolledCount} enrollments!`
+          if (res.removedCount && res.removedCount > 0) {
+            successMsg += ` Removed ${res.removedCount} old enrollments.`
+          }
           handleReset()
           setImportStatus({
             success: true,
@@ -176,8 +180,8 @@ export function RosterUploader({
                   Recommended Column Formats:
                 </div>
                 <div className="text-[11px] text-slate-500 space-y-0.5">
-                  <div>• <code>Registration No</code> or <code>Roll Number</code> (e.g. 626EC6002)</div>
-                  <div>• <code>Full Name</code> or <code>Student Name</code> (e.g. Swastik Sidharth Rath)</div>
+                  <div>• <code>Registration No</code> or <code>Roll Number</code> (e.g. 123CS1001)</div>
+                  <div>• <code>Full Name</code> or <code>Student Name</code> (e.g. John Doe)</div>
                   <div>• <i>Optional:</i> <code>Institutional Email</code>, <code>Department</code></div>
                 </div>
               </div>
@@ -356,10 +360,26 @@ export function RosterUploader({
                     </div>
                   </div>
 
-                  {/* Import Button */}
-                  <div className="flex items-center justify-between pt-2">
-                    <div className="text-xs text-slate-500">
-                      Automatic roll-number parsing will run for each student upon confirmation.
+                  {/* Import Button & Replace Toggle */}
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-2">
+                    <div className="flex flex-col gap-1.5">
+                      <div className="text-xs text-slate-500">
+                        Automatic roll-number parsing will run for each student upon confirmation.
+                      </div>
+                      
+                      {subjectId && existingStudents.length > 0 && (
+                        <label className="flex items-center gap-2 cursor-pointer bg-slate-50 hover:bg-slate-100 p-2 rounded-md border border-slate-200 transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={replaceMode}
+                            onChange={(e) => setReplaceMode(e.target.checked)}
+                            className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-600 h-3.5 w-3.5"
+                          />
+                          <span className="text-xs font-semibold text-slate-700">
+                            Strict Sync (Remove {existingStudents.length} existing students if they aren't in this CSV)
+                          </span>
+                        </label>
+                      )}
                     </div>
 
                     <button

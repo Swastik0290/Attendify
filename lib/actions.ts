@@ -180,17 +180,21 @@ export async function createFacultyByAdmin(name: string, email: string, password
 export async function deleteFaculty(facultyId: string) {
   const session = await getSession()
   if (session?.role !== 'SUPER_ADMIN') {
-    throw new Error('Unauthorized: Only Super Admin can delete faculty')
+    return { success: false, error: 'Unauthorized: Only Super Admin can delete faculty' }
   }
 
   const adminClient = createAdminClient()
   
-  // Note: we just delete the profile. In Supabase, if ON DELETE CASCADE is set,
-  // the users_roles might be deleted, or we can just delete from users_roles manually.
+  // Check if they have subjects first
+  const { data: subjects } = await adminClient.from('subjects').select('id').eq('faculty_id', facultyId)
+  if (subjects && subjects.length > 0) {
+    return { success: false, error: 'Cannot delete faculty because they have subjects assigned to them. Please reassign or delete the subjects first.' }
+  }
+
   await adminClient.from('users_roles').delete().eq('id', facultyId).eq('role', 'FACULTY')
   const { error } = await adminClient.from('faculty_profiles').delete().eq('id', facultyId)
   
-  if (error) throw new Error(error.message)
+  if (error) return { success: false, error: error.message }
   
   safeRevalidate('/admin/faculty')
   return { success: true }
@@ -407,7 +411,8 @@ export async function getEnrolledStudentsForSubject(subjectId: string): Promise<
  */
 export async function importStudentRoster(
   rows: { rollNumber: string; name: string; email?: string }[],
-  subjectId?: string
+  subjectId?: string,
+  replaceMode: boolean = false
 ) {
   const session = await getSession()
   if (!session || (session.role !== 'SUPER_ADMIN' && session.role !== 'FACULTY')) {
@@ -420,6 +425,9 @@ export async function importStudentRoster(
   let importedCount = 0
   let enrolledCount = 0
   let updatedCount = 0
+  let removedCount = 0
+
+  const processedStudentIds: string[] = []
 
   for (const row of rows) {
     const cleanRoll = row.rollNumber.trim().toUpperCase()
@@ -488,6 +496,7 @@ export async function importStudentRoster(
 
     // 3. Enroll into subject if subjectId is provided
     if (subjectId && studentId) {
+      processedStudentIds.push(studentId)
       const { error: enrollError } = await adminClient.from('enrollments').upsert(
         {
           student_id: studentId,
@@ -499,6 +508,18 @@ export async function importStudentRoster(
     }
   }
 
+  // 4. Remove unlisted students if replaceMode is true
+  if (subjectId && replaceMode && processedStudentIds.length > 0) {
+    const { data: removed } = await adminClient
+      .from('enrollments')
+      .delete()
+      .eq('subject_id', subjectId)
+      .not('student_id', 'in', `(${processedStudentIds.join(',')})`)
+      .select('id')
+    
+    removedCount = removed?.length || 0
+  }
+
   safeRevalidate('/admin/students')
   safeRevalidate('/admin/subjects')
   safeRevalidate('/faculty')
@@ -506,7 +527,7 @@ export async function importStudentRoster(
     safeRevalidate(`/faculty/subjects/${subjectId}`)
   }
 
-  return { success: true, importedCount, updatedCount, enrolledCount }
+  return { success: true, importedCount, updatedCount, enrolledCount, removedCount }
 }
 
 // ─── ATTENDANCE SESSIONS & ROTATING QR ACTIONS ─────────────────────────────────

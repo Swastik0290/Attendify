@@ -52,7 +52,14 @@ export function FacultyTable({ initialFaculty = [] }: FacultyTableProps) {
     startTransition(async () => {
       try {
         setErrorMsg(null)
-        await deleteFaculty(facultyId)
+        const res = await deleteFaculty(facultyId)
+        
+        if (!res.success) {
+          setErrorMsg(res.error || 'Failed to delete faculty')
+          setFacultyToDelete(null)
+          return
+        }
+
         setFacultyList((prev) => prev.filter((f) => f.id !== facultyId))
         setSuccessMsg('Faculty account deleted.')
         setFacultyToDelete(null)
