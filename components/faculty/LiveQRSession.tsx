@@ -159,13 +159,13 @@ export function LiveQRSession({ sessionId, subjectCode, subjectName, sessionNumb
                 {token ? (
                   <QRCodeSVG
                     value={qrValue || token}
-                    size={280}
+                    size={420}
                     level="L"
                     includeMargin
                     className="mx-auto"
                   />
                 ) : (
-                  <div className="w-[280px] h-[280px] flex items-center justify-center bg-slate-100 rounded-lg">
+                  <div className="w-[420px] h-[420px] flex items-center justify-center bg-slate-100 rounded-lg">
                     <RefreshCw className="h-8 w-8 text-slate-400 animate-spin" />
                   </div>
                 )}

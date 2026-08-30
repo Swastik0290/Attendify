@@ -5,7 +5,7 @@ import { QRPayload } from './types'
 export const QR_ROTATION_INTERVAL_SECONDS = 8
 
 // Total attendance attempt validity window (seconds) from issuedAt
-export const ATTENDANCE_ATTEMPT_LIFETIME_SECONDS = 60
+export const ATTENDANCE_ATTEMPT_LIFETIME_SECONDS = 15
 
 /**
  * Gets the server-side HMAC signing secret.

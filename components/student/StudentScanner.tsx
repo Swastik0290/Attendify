@@ -144,7 +144,7 @@ export function StudentScanner() {
 
         try {
           await scanner.start(
-            { facingMode: 'environment' },
+            { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
             {
               fps: 12, // From initial version
               qrbox: { width: 240, height: 240 }, // From initial version
