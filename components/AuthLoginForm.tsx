@@ -42,13 +42,6 @@ export function AuthLoginForm({ role }: AuthLoginFormProps) {
         return
       }
 
-      // If action link is provided, navigate directly to authenticate
-      if (res.actionLink) {
-        window.location.href = res.actionLink
-        return
-      }
-
-      // Fallback: signIn with password
       if (res.passwordLogin) {
         const supabase = createClient()
         const { error: authErr } = await supabase.auth.signInWithPassword({
