@@ -112,77 +112,81 @@ export function StudentScanner() {
 
     try {
       // Explicitly request camera permission first to trigger the browser prompt
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+      // Using { video: true } ensures it works on desktop and mobile
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true })
       // Stop the test stream to free the hardware lock
       stream.getTracks().forEach(t => t.stop())
-      // Small delay to ensure the hardware is released before html5-qrcode starts
-      await new Promise(resolve => setTimeout(resolve, 150))
     } catch (err: unknown) {
       // If permission is denied here, we handle it below in the main catch block
     }
 
-    const containerId = 'qr-reader-container'
+    // Set granted to unhide the qr-reader-container in the DOM
+    setCameraState('granted')
 
-    try {
-      if (scannerRef.current) {
-        try {
-          await scannerRef.current.stop()
-        } catch { /* ignore */ }
-      }
+    // Wait for React to render the visible container before injecting the video element
+    setTimeout(async () => {
+      const containerId = 'qr-reader-container'
 
-      const scanner = new Html5Qrcode(containerId, {
-        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
-        verbose: false,
-      })
-      scannerRef.current = scanner
-
-      // Try environment camera first
       try {
-        await scanner.start(
-          { facingMode: 'environment' },
-          {
-            fps: 10,
-            qrbox: { width: 250, height: 250 },
-          },
-          (decodedText: string) => {
-            handleProcessScannedData(decodedText)
-          },
-          () => {}
-        )
-      } catch (envErr) {
-        // Fallback to any available video device
-        const cameras = await Html5Qrcode.getCameras()
-        if (cameras && cameras.length > 0) {
-          const backCam = cameras.find((c) => /back|rear|environment/i.test(c.label)) || cameras[0]
+        if (scannerRef.current) {
+          try {
+            await scannerRef.current.stop()
+          } catch { /* ignore */ }
+        }
+
+        const scanner = new Html5Qrcode(containerId, {
+          formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+          verbose: false,
+        })
+        scannerRef.current = scanner
+
+        // Try environment camera first
+        try {
           await scanner.start(
-            backCam.id,
-            { fps: 20, qrbox: { width: 250, height: 250 } },
+            { facingMode: 'environment' },
+            {
+              fps: 10,
+              qrbox: { width: 250, height: 250 },
+            },
             (decodedText: string) => {
               handleProcessScannedData(decodedText)
             },
             () => {}
           )
+        } catch (envErr) {
+          // Fallback to any available video device
+          const cameras = await Html5Qrcode.getCameras()
+          if (cameras && cameras.length > 0) {
+            const backCam = cameras.find((c) => /back|rear|environment/i.test(c.label)) || cameras[0]
+            await scanner.start(
+              backCam.id,
+              { fps: 10, qrbox: { width: 250, height: 250 } },
+              (decodedText: string) => {
+                handleProcessScannedData(decodedText)
+              },
+              () => {}
+            )
+          } else {
+            throw envErr
+          }
+        }
+
+        isScanningRef.current = true
+      } catch (err: unknown) {
+        const e = err as Error
+        isScanningRef.current = false
+        if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+          setCameraState('denied')
+          setCameraError('Camera access was denied. Please allow camera permissions in browser settings.')
+        } else if (e.name === 'NotFoundError') {
+          setCameraState('error')
+          setCameraError('No camera found on this device. You can paste the token below.')
         } else {
-          throw envErr
+          setCameraState('error')
+          setCameraError(`Camera could not be started: ${e.message || 'Permission or hardware issue'}. Please try again.`)
         }
       }
-
-      isScanningRef.current = true
-      setCameraState('granted')
-    } catch (err: unknown) {
-      const e = err as Error
-      isScanningRef.current = false
-      if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
-        setCameraState('denied')
-        setCameraError('Camera access was denied. Please allow camera permissions in browser settings.')
-      } else if (e.name === 'NotFoundError') {
-        setCameraState('error')
-        setCameraError('No camera found on this device. You can paste the token below.')
-      } else {
-        setCameraState('error')
-        setCameraError(`Camera could not be started: ${e.message || 'Permission or hardware issue'}. Please try again.`)
-      }
-    }
+    }, 150) // 150ms delay gives DOM time to unhide
   }, [cameraState, handleProcessScannedData])
 
   const handleZoom = (direction: 'in' | 'out') => {
