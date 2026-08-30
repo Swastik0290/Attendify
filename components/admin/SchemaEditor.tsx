@@ -23,7 +23,7 @@ type SegmentType = 'numeric' | 'alphanumeric' | 'alpha'
 
 export function SchemaEditor({ initialConfig = DEFAULT_INSTITUTIONAL_SCHEMA }: SchemaEditorProps) {
   const [config, setConfig] = useState<RollSchemaConfig>(initialConfig)
-  const [testRoll, setTestRoll] = useState('626EC6002')
+  const [testRoll, setTestRoll] = useState('124CS1001')
   const [isPending, startTransition] = useTransition()
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
@@ -119,7 +119,7 @@ export function SchemaEditor({ initialConfig = DEFAULT_INSTITUTIONAL_SCHEMA }: S
             type="text"
             value={testRoll}
             onChange={(e) => setTestRoll(e.target.value.toUpperCase())}
-            placeholder="e.g. 626EC6002"
+            placeholder="e.g. 124CS1001"
             className="flex-1 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-mono font-bold focus:border-slate-900 focus:outline-none w-full"
           />
         </div>

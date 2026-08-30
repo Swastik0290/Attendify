@@ -195,7 +195,7 @@ export function AuthLoginForm({ role }: AuthLoginFormProps) {
                   type="text"
                   value={rollNumber}
                   onChange={(e) => setRollNumber(e.target.value.toUpperCase())}
-                  placeholder="e.g. 626EC6002, 123BM1005"
+                  placeholder="e.g. 224CS1001, 123BM1005"
                   required
                   autoFocus
                   className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm font-mono uppercase tracking-wider focus:border-emerald-600 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-600 transition-colors"
@@ -210,7 +210,7 @@ export function AuthLoginForm({ role }: AuthLoginFormProps) {
                   type="text"
                   value={studentName}
                   onChange={(e) => setStudentName(e.target.value)}
-                  placeholder="e.g. Swastik"
+                  placeholder="e.g. Alex Morgan"
                   className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-sm focus:border-emerald-600 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-600 transition-colors"
                 />
               </div>
@@ -235,7 +235,7 @@ export function AuthLoginForm({ role }: AuthLoginFormProps) {
               )}
               {isStudent && (
                 <div className="p-3 text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg">
-                  <strong>Tip:</strong> You can enter your Roll Number (e.g. <code>626EC6002</code>) or institutional email <code>rollnumber@nitrkl.ac.in</code>.
+                  <strong>Tip:</strong> You can enter your Roll Number (e.g. <code>224CS1001</code>) or institutional email <code>rollnumber@nitrkl.ac.in</code>.
                 </div>
               )}
               <div>
@@ -246,7 +246,7 @@ export function AuthLoginForm({ role }: AuthLoginFormProps) {
                   type="text"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder={isStudent ? '626ec6002 or 626ec6002@nitrkl.ac.in' : 'faculty@nitrkl.ac.in'}
+                  placeholder={isStudent ? '224cs1001 or 224cs1001@nitrkl.ac.in' : 'faculty@nitrkl.ac.in'}
                   required
                   className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900 transition-colors"
                 />

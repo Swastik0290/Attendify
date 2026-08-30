@@ -1025,7 +1025,8 @@ export async function unenrollStudent(studentId: string, subjectId: string) {
 export async function signInStudentByRollNumber(
   rollNumber: string,
   nameVerification?: string,
-  origin?: string
+  origin?: string,
+  sendEmailOnly?: boolean
 ) {
   const cleanRoll = rollNumber.trim().toUpperCase()
   if (!cleanRoll) {
@@ -1034,22 +1035,76 @@ export async function signInStudentByRollNumber(
 
   const adminClient = createAdminClient()
 
-  // 1. Look up student profile by roll number
-  const { data: student, error: fetchErr } = await adminClient
+  // 1. Look up student profile by roll number (case-insensitive)
+  let { data: student } = await adminClient
     .from('student_profiles')
     .select('*')
     .ilike('roll_number', cleanRoll)
-    .single()
+    .maybeSingle()
 
-  if (fetchErr || !student) {
-    return {
-      success: false,
-      error: `Roll Number "${cleanRoll}" is not registered. Please ensure your faculty has uploaded the class roster.`,
+  // 2. If not found by roll number, check by email containing the roll number
+  if (!student) {
+    const { data: byEmail } = await adminClient
+      .from('student_profiles')
+      .select('*')
+      .ilike('email', `%${cleanRoll.toLowerCase()}%`)
+      .limit(1)
+    if (byEmail && byEmail.length > 0) {
+      student = byEmail[0]
     }
   }
 
-  // 2. Optional name verification (if entered)
-  if (nameVerification && nameVerification.trim()) {
+  // 3. If student profile doesn't exist yet, auto-provision it so student is not locked out
+  if (!student) {
+    const studentEmail = `${cleanRoll.toLowerCase()}@nitrkl.ac.in`
+    const schemaConfig = await getInstitutionalRollSchema()
+    const parsed = parseRollNumber(cleanRoll, schemaConfig)
+
+    // Check if auth user already exists for this email
+    const { data: existingUsers } = await adminClient.auth.admin.listUsers()
+    const existingUser = existingUsers.users.find(u => u.email?.toLowerCase() === studentEmail.toLowerCase())
+    const studentId = existingUser?.id || crypto.randomUUID()
+
+    await ensureAuthUser(studentId, studentEmail, 'STUDENT')
+
+    const studentName = nameVerification?.trim() || `Student ${cleanRoll}`
+    const { data: created, error: insertErr } = await adminClient
+      .from('student_profiles')
+      .insert({
+        id: studentId,
+        roll_number: cleanRoll,
+        name: studentName,
+        email: studentEmail,
+        derived_program: parsed.program || null,
+        derived_year: parsed.year || null,
+        derived_department: parsed.department || null,
+        derived_serial: parsed.serial || null,
+      })
+      .select()
+      .single()
+
+    if (!insertErr && created) {
+      student = created
+    } else {
+      // Fetch if already inserted concurrently
+      const { data: refetched } = await adminClient
+        .from('student_profiles')
+        .select('*')
+        .ilike('roll_number', cleanRoll)
+        .maybeSingle()
+      student = refetched
+    }
+  }
+
+  if (!student) {
+    return {
+      success: false,
+      error: `Could not initialize profile for Roll Number "${cleanRoll}". Please try again.`,
+    }
+  }
+
+  // 4. Optional name verification (if user provided a name and profile already had one)
+  if (nameVerification && nameVerification.trim() && student.name && !student.name.startsWith('Student ')) {
     const entered = nameVerification.trim().toLowerCase()
     const actual = student.name.trim().toLowerCase()
     const matches =
@@ -1067,10 +1122,9 @@ export async function signInStudentByRollNumber(
   const studentEmail = student.email || `${cleanRoll.toLowerCase()}@nitrkl.ac.in`
   const studentId = student.id
 
-  // 3. Ensure auth user exists and has STUDENT role
+  // 5. Ensure auth user exists and has STUDENT role
   await ensureAuthUser(studentId, studentEmail, 'STUDENT')
 
-  // Set a consistent login password for seamless fallback
   const directPassword = `Nitrkl@${cleanRoll}!2026`
   try {
     await adminClient.auth.admin.updateUserById(studentId, {
@@ -1079,7 +1133,7 @@ export async function signInStudentByRollNumber(
     })
   } catch { /* ignore */ }
 
-  // 4. Try generating a magic link for automatic session creation
+  // 6. Generate Magic Link
   try {
     const redirectUrl = origin ? `${origin}/auth/callback?next=/student` : undefined
     const { data: linkData, error: linkErr } = await adminClient.auth.admin.generateLink({
@@ -1100,7 +1154,7 @@ export async function signInStudentByRollNumber(
         },
       }
     }
-  } catch { /* fallback to password below */ }
+  } catch { /* fallback */ }
 
   return {
     success: true,
@@ -1112,4 +1166,5 @@ export async function signInStudentByRollNumber(
     },
   }
 }
+
 

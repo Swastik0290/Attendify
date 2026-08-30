@@ -69,6 +69,56 @@ export async function getSession(): Promise<AppUserSession | null> {
       .eq('id', user.id)
       .single()
     studentProfile = data
+
+    // If profile not found by auth user ID, search across entire database by email and roll number
+    if (!studentProfile && user.email) {
+      const cleanEmail = user.email.toLowerCase().trim()
+      
+      // 1. Search by exact or case-insensitive email
+      const { data: byEmail } = await adminClient
+        .from('student_profiles')
+        .select('*')
+        .ilike('email', cleanEmail)
+        .limit(1)
+
+      if (byEmail && byEmail.length > 0) {
+        const matched = byEmail[0]
+        const oldId = matched.id
+        studentProfile = matched
+        if (oldId !== user.id) {
+          try {
+            await adminClient.from('enrollments').update({ student_id: user.id }).eq('student_id', oldId)
+            await adminClient.from('attendance_records').update({ student_id: user.id }).eq('student_id', oldId)
+            await adminClient.from('student_profiles').update({ id: user.id, email: cleanEmail }).eq('id', oldId)
+            studentProfile = { ...matched, id: user.id }
+          } catch { /* ignore */ }
+        }
+      } else {
+        // 2. Search by roll number extracted from email (e.g. 124cs1001@nitrkl.ac.in -> 124CS1001)
+        const rollCandidate = cleanEmail.split('@')[0].toUpperCase()
+        if (rollCandidate.length >= 4) {
+          const { data: byRoll } = await adminClient
+            .from('student_profiles')
+            .select('*')
+            .ilike('roll_number', rollCandidate)
+            .limit(1)
+
+          if (byRoll && byRoll.length > 0) {
+            const matched = byRoll[0]
+            const oldId = matched.id
+            studentProfile = matched
+            if (oldId !== user.id) {
+              try {
+                await adminClient.from('enrollments').update({ student_id: user.id }).eq('student_id', oldId)
+                await adminClient.from('attendance_records').update({ student_id: user.id }).eq('student_id', oldId)
+                await adminClient.from('student_profiles').update({ id: user.id, email: cleanEmail }).eq('id', oldId)
+                studentProfile = { ...matched, id: user.id, email: cleanEmail }
+              } catch { /* ignore */ }
+            }
+          }
+        }
+      }
+    }
   }
 
   return {
@@ -79,4 +129,5 @@ export async function getSession(): Promise<AppUserSession | null> {
     studentProfile,
   }
 }
+
 

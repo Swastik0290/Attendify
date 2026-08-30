@@ -89,25 +89,25 @@ export default async function StudentDashboardPage() {
           <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
             <div className="text-[10px] uppercase font-semibold text-slate-400">Program</div>
             <div className="font-bold text-slate-800 mt-0.5">
-              {profile.derived_program || 'M.Tech Research'}
+              {profile.derived_program || 'Degree Program'}
             </div>
           </div>
           <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
             <div className="text-[10px] uppercase font-semibold text-slate-400">Department</div>
             <div className="font-bold text-slate-800 mt-0.5">
-              {profile.derived_department || 'Electronics & Communication'}
+              {profile.derived_department || 'Department'}
             </div>
           </div>
           <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
             <div className="text-[10px] uppercase font-semibold text-slate-400">Admission Year</div>
             <div className="font-mono font-bold text-slate-800 mt-0.5">
-              {profile.derived_year || '2026'}
+              {profile.derived_year || '—'}
             </div>
           </div>
           <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
             <div className="text-[10px] uppercase font-semibold text-slate-400">Student Serial</div>
             <div className="font-mono font-bold text-slate-800 mt-0.5">
-              {profile.derived_serial || '6002'}
+              {profile.derived_serial || '—'}
             </div>
           </div>
         </div>
