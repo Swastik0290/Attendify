@@ -1019,3 +1019,97 @@ export async function unenrollStudent(studentId: string, subjectId: string) {
   safeRevalidate('/admin/students')
   return { success: true }
 }
+
+// ─── STUDENT ROLL NUMBER AUTHENTICATION ─────────────────────────────────────
+
+export async function signInStudentByRollNumber(
+  rollNumber: string,
+  nameVerification?: string,
+  origin?: string
+) {
+  const cleanRoll = rollNumber.trim().toUpperCase()
+  if (!cleanRoll) {
+    return { success: false, error: 'Please enter your Roll Number.' }
+  }
+
+  const adminClient = createAdminClient()
+
+  // 1. Look up student profile by roll number
+  const { data: student, error: fetchErr } = await adminClient
+    .from('student_profiles')
+    .select('*')
+    .ilike('roll_number', cleanRoll)
+    .single()
+
+  if (fetchErr || !student) {
+    return {
+      success: false,
+      error: `Roll Number "${cleanRoll}" is not registered. Please ensure your faculty has uploaded the class roster.`,
+    }
+  }
+
+  // 2. Optional name verification (if entered)
+  if (nameVerification && nameVerification.trim()) {
+    const entered = nameVerification.trim().toLowerCase()
+    const actual = student.name.trim().toLowerCase()
+    const matches =
+      actual.includes(entered) ||
+      entered.includes(actual.split(' ')[0]) ||
+      actual.startsWith(entered)
+    if (!matches) {
+      return {
+        success: false,
+        error: `Name does not match the registered profile for Roll No ${cleanRoll}.`,
+      }
+    }
+  }
+
+  const studentEmail = student.email || `${cleanRoll.toLowerCase()}@nitrkl.ac.in`
+  const studentId = student.id
+
+  // 3. Ensure auth user exists and has STUDENT role
+  await ensureAuthUser(studentId, studentEmail, 'STUDENT')
+
+  // Set a consistent login password for seamless fallback
+  const directPassword = `Nitrkl@${cleanRoll}!2026`
+  try {
+    await adminClient.auth.admin.updateUserById(studentId, {
+      password: directPassword,
+      email_confirm: true,
+    })
+  } catch { /* ignore */ }
+
+  // 4. Try generating a magic link for automatic session creation
+  try {
+    const redirectUrl = origin ? `${origin}/auth/callback?next=/student` : undefined
+    const { data: linkData, error: linkErr } = await adminClient.auth.admin.generateLink({
+      type: 'magiclink',
+      email: studentEmail,
+      options: redirectUrl ? { redirectTo: redirectUrl } : undefined,
+    })
+
+    if (!linkErr && linkData?.properties?.action_link) {
+      return {
+        success: true,
+        email: studentEmail,
+        studentName: student.name,
+        actionLink: linkData.properties.action_link,
+        passwordLogin: {
+          email: studentEmail,
+          password: directPassword,
+        },
+      }
+    }
+  } catch { /* fallback to password below */ }
+
+  return {
+    success: true,
+    email: studentEmail,
+    studentName: student.name,
+    passwordLogin: {
+      email: studentEmail,
+      password: directPassword,
+    },
+  }
+}
+

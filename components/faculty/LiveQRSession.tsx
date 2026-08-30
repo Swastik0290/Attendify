@@ -38,6 +38,17 @@ export function LiveQRSession({ sessionId, subjectCode, subjectName, sessionNumb
   const [isClosing, startCloseTransition] = useTransition()
   const router = useRouter()
 
+  const [origin, setOrigin] = useState('')
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setOrigin(window.location.origin)
+    }
+  }, [])
+
+  const qrValue = token
+    ? (origin ? `${origin}/student/scan?token=${encodeURIComponent(token)}` : token)
+    : ''
+
   // Fetch rotating QR token
   const fetchNewToken = useCallback(async () => {
     if (!isSessionActive) return
@@ -147,7 +158,7 @@ export function LiveQRSession({ sessionId, subjectCode, subjectName, sessionNumb
               <div className="relative p-5 bg-white rounded-2xl shadow-xl border-4 border-slate-900 inline-block">
                 {token ? (
                   <QRCodeSVG
-                    value={token}
+                    value={qrValue || token}
                     size={280}
                     level="L"
                     includeMargin
