@@ -23,15 +23,31 @@ export default async function FacultyDashboardPage() {
 
   if (session.role !== 'FACULTY' && session.role !== 'SUPER_ADMIN') {
     return (
-      <main className="max-w-lg mx-auto my-12 p-8 bg-white rounded-2xl border border-slate-200 shadow-sm text-center">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 mb-4">
+      <main className="max-w-lg mx-auto my-12 p-8 bg-white rounded-2xl border border-slate-200 shadow-sm text-center space-y-4">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 mb-2">
           <Shield className="h-8 w-8 text-slate-400" />
         </div>
-        <h2 className="text-xl font-bold text-slate-900 mb-2">Faculty Access Required</h2>
-        <p className="text-sm text-slate-600 mb-6">
-          You are currently signed in as a Student. If you are a faculty member, you must register your profile and wait for Super Admin approval.
+        <h2 className="text-xl font-bold text-slate-900">Faculty Access Required</h2>
+        <p className="text-sm text-slate-600">
+          You are currently signed in as <span className="font-semibold text-slate-900">{session.email}</span> (Student role). If you are a faculty member, register below or switch accounts.
         </p>
         <FacultyRegistrationForm />
+        <div className="pt-4 border-t border-slate-100 flex items-center justify-center gap-3">
+          <Link
+            href="/student"
+            className="text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 px-4 py-2.5 rounded-xl transition-colors"
+          >
+            Go to Student Portal
+          </Link>
+          <form action={signOut}>
+            <button
+              type="submit"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-4 py-2.5 rounded-xl transition-colors"
+            >
+              <LogOut className="h-3.5 w-3.5" /> Sign Out
+            </button>
+          </form>
+        </div>
       </main>
     )
   }
@@ -39,19 +55,29 @@ export default async function FacultyDashboardPage() {
   // If faculty is in PENDING state
   if (facultyProfile && facultyProfile.status === 'PENDING') {
     return (
-      <main className="max-w-lg mx-auto my-12 p-8 bg-white rounded-2xl border border-amber-200 shadow-sm text-center">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-amber-100 mb-4">
+      <main className="max-w-lg mx-auto my-12 p-8 bg-white rounded-2xl border border-amber-200 shadow-sm text-center space-y-4">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-amber-100 mb-2">
           <Clock className="h-8 w-8 text-amber-700" />
         </div>
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-100 text-amber-800 mb-2">
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-100 text-amber-800">
           Registration Status: Pending
         </span>
         <h1 className="text-xl font-bold text-slate-900 mt-1">
           Account Awaiting Super Admin Approval
         </h1>
-        <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+        <p className="text-xs text-slate-600 leading-relaxed">
           Hello <strong>{facultyProfile.name}</strong>, your faculty account has been registered and is currently waiting for verification by the Super Admin. You will be able to create subjects and start attendance sessions once approved.
         </p>
+        <div className="pt-4 border-t border-slate-100 flex justify-center">
+          <form action={signOut}>
+            <button
+              type="submit"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-red-600 bg-slate-100 hover:bg-red-50 px-4 py-2.5 rounded-xl transition-colors"
+            >
+              <LogOut className="h-3.5 w-3.5" /> Sign Out
+            </button>
+          </form>
+        </div>
       </main>
     )
   }
