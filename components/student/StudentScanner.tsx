@@ -99,8 +99,6 @@ export function StudentScanner() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlToken])
 
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
-
   const startCamera = useCallback(async () => {
     if (cameraState === 'requesting' || cameraState === 'granted') return
     setCameraState('requesting')
@@ -118,9 +116,6 @@ export function StudentScanner() {
       const scanner = new Html5Qrcode(containerId, {
         formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
         verbose: false,
-        experimentalFeatures: {
-          useBarCodeDetectorIfSupported: true,
-        },
       })
       scannerRef.current = scanner
 
@@ -129,9 +124,8 @@ export function StudentScanner() {
         await scanner.start(
           { facingMode: 'environment' },
           {
-            fps: 20,
+            fps: 10,
             qrbox: { width: 250, height: 250 },
-            aspectRatio: 1.0,
           },
           (decodedText: string) => {
             handleProcessScannedData(decodedText)
@@ -163,45 +157,17 @@ export function StudentScanner() {
       isScanningRef.current = false
       if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
         setCameraState('denied')
-        setCameraError('Camera access was denied. Please allow camera permissions in browser settings or use your phone’s default Camera app / upload a photo below.')
+        setCameraError('Camera access was denied. Please allow camera permissions in browser settings.')
       } else if (e.name === 'NotFoundError') {
         setCameraState('error')
-        setCameraError('No camera found on this device. You can paste the token or upload a photo below.')
+        setCameraError('No camera found on this device. You can paste the token below.')
       } else {
         setCameraState('error')
-        setCameraError(`Camera could not be started: ${e.message || 'Permission or hardware issue'}. Try using the "Take Photo" button or your phone's default camera.`)
+        setCameraError(`Camera could not be started: ${e.message || 'Permission or hardware issue'}. Try using your phone's default camera app to scan.`)
       }
     }
   }, [cameraState, handleProcessScannedData])
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    try {
-      setIsProcessing(true)
-      let scanner = scannerRef.current
-      if (!scanner) {
-        scanner = new Html5Qrcode('qr-reader-container', {
-          formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
-          verbose: false,
-        })
-        scannerRef.current = scanner
-      }
-
-      const decodedText = await scanner.scanFile(file, true)
-      if (decodedText) {
-        await handleProcessScannedData(decodedText)
-      }
-    } catch (err: any) {
-      setCameraError('Could not find a valid QR code in the uploaded image. Please try taking a clearer photo.')
-    } finally {
-      setIsProcessing(false)
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
-      }
-    }
-  }
 
   // Cleanup on unmount
   useEffect(() => {
@@ -362,22 +328,7 @@ export function StudentScanner() {
                       <Camera className="h-4 w-4" />
                       Live Camera Scan
                     </button>
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-slate-800 hover:bg-slate-700 px-5 py-3 text-xs font-bold text-white transition-colors border border-slate-700 shadow-md"
-                    >
-                      <Sparkles className="h-4 w-4 text-amber-400" />
-                      Upload / Take Photo
-                    </button>
                   </div>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                  />
                 </div>
               )}
 
@@ -405,21 +356,7 @@ export function StudentScanner() {
                     >
                       <RefreshCw className="h-3.5 w-3.5" /> Try Live Camera Again
                     </button>
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-xs font-semibold text-white transition-colors"
-                    >
-                      <Camera className="h-3.5 w-3.5" /> Take Photo Instead
-                    </button>
                   </div>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                  />
                 </div>
               )}
 

@@ -18,7 +18,7 @@ export function AuthLoginForm({ role }: AuthLoginFormProps) {
   const [showPassword, setShowPassword] = useState(false)
   const [rollNumber, setRollNumber] = useState('')
   const [studentName, setStudentName] = useState('')
-  const [tab, setTab] = useState<'roll' | 'password' | 'google'>(isStudent ? 'roll' : 'password')
+  const [tab, setTab] = useState<'roll' | 'password' | 'google'>(isStudent ? 'google' : 'password')
 
   const Icon = isStudent ? GraduationCap : UserCheck
   const accentColor = isStudent ? 'emerald' : 'sky'
@@ -42,18 +42,22 @@ export function AuthLoginForm({ role }: AuthLoginFormProps) {
         return
       }
 
-      if (res.passwordLogin) {
+      if (res.email) {
+        // Enforce Google verification to prevent impersonation
         const supabase = createClient()
-        const { error: authErr } = await supabase.auth.signInWithPassword({
-          email: res.passwordLogin.email,
-          password: res.passwordLogin.password,
+        const { error: authErr } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: `${window.location.origin}/auth/callback?next=${destination}`,
+            queryParams: {
+              login_hint: res.email, // Pre-fill their institutional email
+            }
+          },
         })
 
         if (authErr) {
           setError(authErr.message)
           setIsLoading(false)
-        } else {
-          window.location.href = destination
         }
       }
     } catch (err: any) {
@@ -173,10 +177,10 @@ export function AuthLoginForm({ role }: AuthLoginFormProps) {
             <form onSubmit={handleRollNumberLogin} className="space-y-4">
               <div className="p-3 text-xs text-emerald-800 bg-emerald-50/80 border border-emerald-200 rounded-xl space-y-1">
                 <div className="font-semibold flex items-center gap-1 text-emerald-900">
-                  <Sparkles className="h-3.5 w-3.5 text-emerald-600" /> Instant Roll Number Login
+                  <Sparkles className="h-3.5 w-3.5 text-emerald-600" /> Secure Roll Number Verification
                 </div>
                 <p className="text-[11px] text-emerald-700">
-                  Enter your registered institutional Roll Number to sign in instantly. No password required!
+                  Enter your registered institutional Roll Number. You will be redirected to verify your identity with your institutional Google account.
                 </p>
               </div>
 
@@ -213,8 +217,8 @@ export function AuthLoginForm({ role }: AuthLoginFormProps) {
                 disabled={isLoading || !rollNumber.trim()}
                 className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-5 py-3.5 text-sm font-bold text-white transition-all shadow-md active:scale-98 disabled:opacity-60"
               >
-                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
-                Sign In to Student Portal
+                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Globe className="h-4 w-4" />}
+                Verify with Google
               </button>
             </form>
           )}
